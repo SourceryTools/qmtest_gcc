@@ -56,14 +56,16 @@ class CompatTest(DejaGNUTest):
         src2 = src1.replace("_main", "_x")
         src3 = src1.replace("_main", "_y")
 
-        obj1 = "main_tst.o"
-        obj2_tst = "x_tst.o"
-        obj2_alt = "x_alt.o"
-        obj3_tst = "y_tst.o"
-        obj3_alt = "y_alt.o"
+        temp_dir = context.GetTemporaryDirectory()
+        obj1 = os.path.join(temp_dir, "main_tst.o")
+        obj2_tst = os.path.join(temp_dir, "x_tst.o")
+        obj2_alt = os.path.join(temp_dir, "x_alt.o")
+        obj3_tst = os.path.join(temp_dir, "y_tst.o")
+        obj3_alt = os.path.join(temp_dir, "y_alt.o")
 
         self._testcase = re.sub("_main.*", "", self.GetId())
-        execbase = self._testcase.replace(os.sep, "-")
+        execbase = os.path.join(temp_dir,
+                                self._testcase.replace(os.sep, "-"))
 
         count = 0
         option_list = [("", "")]

@@ -67,9 +67,11 @@ class GCOVTest:
         testcase = gcov_args[-1]
         
         # Run "gcov" to collect coverage information.
-        status, output = self._RunBuildExecutable(context, result,
-                                                  context["GCOVTest.gcov"],
-                                                  gcov_args)
+        status, output \
+            = self._RunBuildExecutable(context, result,
+                                       context["GCOVTest.gcov"],
+                                       gcov_args,
+                                       context.GetTemporaryDirectory())
         if status != 0:
             self._RecordDejaGNUOutcome(result,
                                        self.FAIL,
@@ -78,7 +80,8 @@ class GCOVTest:
             self._CleanUp(testcase)
             return
 
-        gcov_file = testcase + ".gcov"
+        gcov_file = os.path.join(context.GetTemporaryDirectory(),
+                                 testcase + ".gcov")
         if not os.path.exists(gcov_file):
             self._RecordDejaGNUOutcome(result,
                                        self.FAIL,

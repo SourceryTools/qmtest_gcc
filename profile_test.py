@@ -53,8 +53,9 @@ class ProfileTest(DejaGNUTest):
         # Initialize.
         self._SetUp(context)
 
+        temp_dir = context.GetTemporaryDirectory()
         basename = os.path.basename(self.GetId())
-        executable = os.path.join(self._GetTmpdir(),
+        executable = os.path.join(temp_dir,
                                   os.path.splitext(basename)[0] + ".x")
                       
         count = 0
@@ -84,11 +85,12 @@ class ProfileTest(DejaGNUTest):
                                    o)
 
             # Run the profiled executable.
-            outcome = self._RunTargetExecutable(context, result, execname1)
+            outcome = self._RunTargetExecutable(context, result, execname1,
+                                                temp_dir)
             message = self.GetId() + " execution,   " + ostr
             if outcome == self.PASS:
                 base = os.path.splitext(basename)[0]
-                file = base + self.prof_ext
+                file = os.path.join(temp_dir, base + self.prof_ext)
                 if not os.path.exists(file):
                     outcome = self.FAIL
                     message = (self.GetId() + " execution: file "

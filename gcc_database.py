@@ -71,6 +71,8 @@ class GPPDatabase(ExtensionDatabase):
          "gpp_profile_test.GPPProfileTest"),
         (os.path.join("g++.dg", "tls"),
          "gpp_dg_tls_test.GPPDGTLSTest"),
+        (os.path.join("g++.dg", "compat"),
+         "gpp_compat_test.GPPCompatTest"),
         (os.path.join("g++.dg", "debug"),
          "gpp_dg_debug_test.GPPDGDebugTest"),
         (os.path.join("g++.dg", "gcov"),
@@ -78,7 +80,7 @@ class GPPDatabase(ExtensionDatabase):
         (os.path.join("g++.dg", "pch"),
          "gpp_dg_pch_test.GPPDGPCHTest"),
         ("g++.dg", "gpp_dg_test.GPPDGTest"),
-        ("g++.old-deja", "gpp_dg_test.GPPDGTest")
+        ("g++.old-deja", "gpp_old_deja_test.GPPOldDejaTest")
         )
     """A map from test name prefixes to test classes.
 
@@ -172,10 +174,20 @@ class GPPDatabase(ExtensionDatabase):
     def _IsFile(self, kind, path):
 
         val = ExtensionDatabase._IsFile(self, kind, path)
-
-        # Non-directories are not suites.
-        if val and kind == ExtensionDatabase.SUITE and not os.path.isdir(path):
+        if not val:
             return 0
+        
+        # Non-directories are not suites.
+        if kind == ExtensionDatabase.SUITE and not os.path.isdir(path):
+            return 0
+
+        # In the g++.dg/compat subdirectory, only tests that end with
+        # _main.C are tests.
+        if kind == ExtensionDatabase.TEST:
+            rel_path = path[len(self.GetRoot()):]
+            if (rel_path.startswith(os.sep + os.path.join("g++.dg", "compat"))
+                and not rel_path.endswith("_main.C")):
+                return 0
 
         return val
     

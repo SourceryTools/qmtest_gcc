@@ -62,7 +62,7 @@ class GPPDGTest(DGTest):
 
     __prune_regexp \
          = re.compile("(?m)("
-                      "(^.*: In ((static member)?function|member|method"
+                      "(^.*: In ((static member )?function|member|method"
                        "|(copy )?constructor|instantiation|program|subroutine"
                        "|block-data) .*)"
                       "|(^.*: At (top level|global scope):.*)"
@@ -97,7 +97,9 @@ class GPPDGTest(DGTest):
 
             # See if the pattern appears in the output.
             pattern = args[0]
-            output = self.__GetOutputFile(self.KIND_COMPILE, self.GetId())
+            output = self.__GetOutputFile(context,
+                                          self.KIND_COMPILE,
+                                          self.GetId())
             output = open(output).read()
             # Run the output through the demangler, if necessary.
             if command in ("scan-assembler-dem", "scan-assembler-dem-not"):
@@ -120,6 +122,36 @@ class GPPDGTest(DGTest):
             return DGTest._ExecuteFinalCommand(self, command, args,
                                                context, result)
 
+
+    def _DGgpp_additional_files(self, line_num, args, context):
+        """Emulate the 'dg-gpp-additional-file' command.
+
+        'line_num' -- The number at which the command was found.
+
+        'args' -- The arguments to the command, as a list of
+        strings.
+
+        'context' -- The 'Context' in which the test is running."""
+
+        # This function is only used to handle exotic situations where
+        # files have to be downloaded to a target systems.  Our
+        # DejaGNU emulation does not presently support this
+        # functionality.
+        return
+
+
+    def _DGgpp_additional_sources(self, line_num, args, context):
+        """Emulate the 'dg-gpp-additional-sources' command.
+
+        'line_num' -- The number at which the command was found.
+
+        'args' -- The arguments to the command, as a list of
+        strings.
+
+        'context' -- The 'Context' in which the test is running."""
+
+        self.__additional_source_files = args[0].split()
+
         
     def _GetTargetEnvironment(self, context):
 
@@ -129,26 +161,40 @@ class GPPDGTest(DGTest):
     def _PruneOutput(self, output):
 
         # This function emulates prune_gcc_output.
-        return re.sub(self.__prune_regexp, "", output)
+        return self.__prune_regexp.sub("", output)
         
         
     def _RunTool(self, path, kind, options, context, result):
 
         # This method emulates g++-dg-test.
 
-        file = self.__GetOutputFile(kind, path)
+        source_files = [path]
+        if self.__additional_source_files:
+            dirname = os.path.dirname(path)
+            source_files += map(lambda f: os.path.join(dirname, f),
+                                self.__additional_source_files)
+        options = options.split()
+        if "-frepo" in options:
+            is_repo_test = 1
+            kind = DGTest.KIND_ASSEMBLE
+        else:
+            is_repo_test = 0
+        file = self.__GetOutputFile(context, kind, path)
         kind = self.__test_kind_map[kind]
-        output = gpp.compile(context, result,
-                             [path],
-                             file,
-                             kind,
-                             options.split(),
-                             self)
-            
+        output = gpp.compile(context, result, source_files, file,
+                             kind, options, self)
+        if is_repo_test:
+            kind = DGTest.KIND_LINK
+            object_file = file
+            file = self.__GetOutputFile(context, kind, path)
+            kind = self.__test_kind_map[kind]
+            output += gpp.compile(context, result, [object_file], file,
+                                  kind, options, self)
+
         return (output, file)
 
         
-    def __GetOutputFile(self, kind, path = None):
+    def __GetOutputFile(self, context, kind, path = None):
         """Return the compilation mode and output file name for the test.
 
         'kind' -- The kind of test being performed; one of
@@ -166,8 +212,11 @@ class GPPDGTest(DGTest):
         if kind != self.KIND_PRECOMPILE:
             file = os.path.splitext(file)[0]
         file += ext
-        if kind == self.KIND_RUN:
-            file = os.path.join(".", file)
 
-        return file
+        return os.path.join(context.GetTemporaryDirectory(), file)
         
+
+    def _SetUp(self, context):
+
+        self.__additional_source_files = None
+        super(GPPDGTest, self)._SetUp(context)

@@ -18,7 +18,7 @@
 import os
 import qm
 from   qm.common import QMException
-from   qm.executable import TimeoutRedirectedExecutable
+from   qm.executable import RedirectedExecutable
 from   qm.test.test import Test
 from   qm.test.result import Result
 
@@ -50,8 +50,8 @@ class DejaGNUTest(Test):
     UNSUPPORTED = "UNSUPPORTED"
 
     dejagnu_outcomes = (
-        PASS, FAIL, XPASS, XFAIL, WARNING,
-        UNTESTED, UNRESOLVED, UNSUPPORTED
+        PASS, FAIL, XPASS, XFAIL, WARNING, ERROR, UNTESTED,
+        UNRESOLVED, UNSUPPORTED
         )
     """The DejaGNU test outcomes."""
     
@@ -79,17 +79,11 @@ class DejaGNUTest(Test):
     prefix is followed by an 1-indexed integer; earlier results are
     inserted with lower numbers."""
 
-    class TargetExecutable(TimeoutRedirectedExecutable):
+    class TargetExecutable(RedirectedExecutable):
         """A 'TargetExecutable' runs on the target system.
 
         Classes derived from 'DejaGNUTest' may provide derived
         versions of this class."""
-
-        def __init__(self, timeout):
-
-            # Initialize the base class.
-            TimeoutRedirectedExecutable.__init__(self, 10)
-
 
         def _StdinPipe(self):
 
@@ -103,17 +97,11 @@ class DejaGNUTest(Test):
             return None
             
 
-    class BuildExecutable(TimeoutRedirectedExecutable):
+    class BuildExecutable(RedirectedExecutable):
         """A 'BuildExecutable' runs on the build machine.
 
         Classes derived from 'DejaGNUTest' may provide derived
         versions of this class."""
-
-        def __init__(self, timeout):
-
-            # Initialize the base class.
-            TimeoutRedirectedExecutable.__init__(self, 10)
-
 
         def _StdinPipe(self):
 
@@ -140,7 +128,8 @@ class DejaGNUTest(Test):
         return {}
     
 
-    def _RunBuildExecutable(self, context, result, file, args = []):
+    def _RunBuildExecutable(self, context, result, file, args = [],
+                            dir = None):
         """Run 'file' on the target.
 
         'context' -- The 'Context' in which this test is running.
@@ -151,6 +140,8 @@ class DejaGNUTest(Test):
 
         'args' -- The arguments to the 'file'.
 
+        'dir' -- The directory in which the program should execute.
+
         returns -- A pair '(status, output)'.  The 'status' is the
         exit status from the command; the 'output' is the combined
         results of the standard output and standard error streams."""
@@ -158,14 +149,14 @@ class DejaGNUTest(Test):
         executable = self.BuildExecutable(self.executable_timeout)
         command = [file] + args
         index = self._RecordCommand(result, command)
-        status = executable.Run(command)
+        status = executable.Run(command, None, dir)
         output = executable.stdout
         self._RecordCommandOutput(result, index, status, output)
 
         return status, output
 
     
-    def _RunTargetExecutable(self, context, result, file):
+    def _RunTargetExecutable(self, context, result, file, dir = None):
         """Run 'file' on the target.
 
         'context' -- The 'Context' in which this test is running.
@@ -174,14 +165,15 @@ class DejaGNUTest(Test):
         
         'file' -- The path to the executable file.
 
+        'dir' -- The directory in which the program should execute.
+        
         returns -- One of the 'dejagnu_outcomes'."""
 
-        executable \
-            = self.TargetExecutable(self.executable_timeout)
+        executable = self.TargetExecutable(self.executable_timeout)
         command = [file]
         index = self._RecordCommand(result, command)
         environment = self._GetTargetEnvironment(context)
-        status = executable.Run(command, environment)
+        status = executable.Run(command, environment, dir)
         output = executable.stdout
         self._RecordCommandOutput(result, index, status, output)
         # Figure out whether the execution was successful.
@@ -268,6 +260,16 @@ class DejaGNUTest(Test):
             result[Result.CAUSE] = message
         
 
+    def _Unresolved(self, result, message):
+        """Record an 'unresolved' DejaGNU outcome.
+
+        This function is identical to 'RecordDejaGNUOutcome', except
+        that the 'outcome' is always 'UNRESOLVED'."""
+
+        self._RecordDejaGNUOutcome(result, self.UNRESOLVED, message)
+
+        
+        
     def _Error(self, message):
         """Raise an exception indicating an error in the test.
 
@@ -324,14 +326,6 @@ class DejaGNUTest(Test):
         return self._GetTarget(context) == self._GetBuild(context)
     
         
-    def _GetTmpdir(self):
-        """Return the path to the temporary directory.
-
-        returns -- The path to the temporary directory."""
-
-        return "/tmp"
-    
-        
     def _SetUp(self, context):
         """Prepare to run a test.
 
@@ -346,10 +340,14 @@ class DejaGNUTest(Test):
         self.__next_result = 1
 
         
-    def _ParseTclWords(self, s):
+    def _ParseTclWords(self, s, variables = {}):
         """Separate 's' into words, in the same way that Tcl would.
 
         's' -- A string.
+
+        'variables' -- A map from variable names to values.  If Tcl
+        variable substitutions are encountered in 's', the
+        corresponding value from 'variables' will be used.
 
         returns -- A sequence of strings, each of which is a Tcl
         word.
@@ -372,12 +370,38 @@ class DejaGNUTest(Test):
         # Nor are we processing a brace-quoted string.
         in_brace_quoted_string = 0
         # Iterate through all of the characters in s.
-        while s:
+        n = 0
+        while n < len(s):
             # See what the next character is.
-            c = s[0]
-            # A "$" indicates variable substitution.  A "[" indicates
-            # command substitution.
-            if (c == "$" or c == "[") and not in_brace_quoted_string:
+            c = s[n]
+            # A "$" indicates variable substitution.
+            if c == "$" and not in_brace_quoted_string:
+                k = n + 1
+                if s[k] == "{":
+                    # The name of the variable is enclosed in braces.
+                    start = k + 1
+                    finish = s.index("}", start)
+                    n = finish + 1
+                else:
+                    # The following letters, numbers, and underscores make
+                    # up the variable name.
+                    start = k
+                    while (k < len(s)
+                           and (s[k].isalnum() or s[k] == "_")):
+                        k += 1
+                    n = k
+                    finish = k
+                v = s[start:finish]
+                if not v:
+                    raise QMException, "Invalid Tcl variable name."
+                v = variables[v]
+                if word is None:
+                    word = v
+                else:
+                    word += v
+                continue
+            # A "[" indicates command substitution.
+            elif c == "[" and not in_brace_quoted_string:
                 raise QMException, "Unsupported Tcl substitution."
             # A double-quote indicates the beginning of a double-quoted
             # string.
@@ -386,7 +410,7 @@ class DejaGNUTest(Test):
                 # leaving the old one.
                 in_double_quoted_string = not in_double_quoted_string
                 # Skip the quote.
-                s = s[1:]
+                n += 1
                 # The quote starts the word.
                 if word is None:
                     word = ""
@@ -405,12 +429,12 @@ class DejaGNUTest(Test):
                 # We are entering a brace-quoted string.
                 in_brace_quoted_string += 1
                 # Skip the brace.
-                s = s[1:]
+                n += 1
             elif c == '}' and in_brace_quoted_string:
                 # Leave the brace quoted string.
                 in_brace_quoted_string -= 1
                 # Skip the brace.
-                s = s[1:]
+                n += 1
                 # If that's not the closing quote, add it to the
                 # string.
                 if in_brace_quoted_string:
@@ -421,26 +445,27 @@ class DejaGNUTest(Test):
             # A backslash-newline is translated into a space.
             elif c == '\\' and len(s) > 1 and s[1] == '\n':
                 # Skip the backslash and the newline.
-                s = s[2:]
+                n += 2
                 # Now, skip tabs and spaces.
-                while s and (s[0] == ' ' or s[0] == '\t'):
-                    s = s[1:]
+                while n < len(s) and (s[n] == ' ' or s[n] == '\t'):
+                    n += 1
                 # Now prepend one space.
-                s = " " + s
+                n -= 1
+                s[n] = " "
             # A backslash indicates backslash-substitution.
             elif c == '\\' and not in_brace_quoted_string:
                 # There should be a character following the backslash.
                 if len(s) == 1:
                     raise QMException, "Invalid Tcl string."
                 # Skip the backslash.
-                s = s[1:]
+                n += 1
                 # See what the next character is.
-                c = s[0]
+                c = s[n]
                 # If it's a control character, use the same character
                 # in Python.
                 if c in ["a", "b", "f", "n", "r", "t", "v"]:
                     c = eval('"\%s"' % c)
-                    s = s[1:]
+                    n += 1
                 # "\x" indicates a hex literal.
                 elif c == "x":
                     raise QMException, "Unsupported Tcl escape."
@@ -450,7 +475,7 @@ class DejaGNUTest(Test):
                 # Any other character just indicates the character
                 # itself.
                 else:
-                    s = s[1:]
+                    n += 1
                 # Add it to the current word.
                 if word is not None:
                     word = word + c
@@ -464,11 +489,11 @@ class DejaGNUTest(Test):
                 if word is not None:
                     words.append(word)
                 # Skip over the space.
-                s = s[1:]
+                n += 1
                 # Keep skipping while the leading character of s is
                 # a space or tab.
-                while s and (s[0] == ' ' or s[0] == '\t'):
-                    s = s[1:]
+                while n < len(s) and (s[n] == ' ' or s[n] == '\t'):
+                    n += 1
                 # Start the next word.
                 word = None
             # Any other character is just added to the current word.
@@ -477,10 +502,10 @@ class DejaGNUTest(Test):
                     word = word + c
                 else:
                     word = c
-                s = s[1:]
+                n += 1
 
         # If we were working on a word when we reached the end of
-        # the stirng, add it to the list.
+        # the string, add it to the list.
         if word is not None:
             words.append(word)
 

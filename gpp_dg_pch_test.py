@@ -36,6 +36,8 @@ class GPPDGPCHTest(GPPDGTest):
         # Remove stuff left from the last time the test was run.
         source = self._GetSourcePath()
         basename = os.path.splitext(os.path.basename(source))[0]
+        basename = os.path.join(context.GetTemporaryDirectory(),
+                                basename)
         for f in (basename + ".H.gch",
                   basename + ".s",
                   basename + ".s-gch"):

@@ -109,8 +109,9 @@ class DGTest(DejaGNUTest):
             line_num += 1
             m = self.__dg_command_regexp.search(l)
             if m:
-                f = getattr(self, "_DGTest__DG" + m.group(1))
-                args = self._ParseTclWords(m.group(2))
+                f = getattr(self, "_DG" + m.group(1).replace("-", "_"))
+                args = self._ParseTclWords(m.group(2),
+                                           { "srcdir" : root })
                 f(line_num, args, context)
 
         # If this test does not need to be run on this target, stop.
@@ -165,10 +166,10 @@ class DGTest(DejaGNUTest):
         # If there's any output left, the test fails.
         message = self._name + " (test for excess errors)"
         if output != "":
-            outcome = self.FAIL
+            self._RecordDejaGNUOutcome(result, self.FAIL, message)
+            result["DGTest.excess_errors"] = output
         else:
-            outcome = self.PASS
-        self._RecordDejaGNUOutcome(result, outcome, message)
+            self._RecordDejaGNUOutcome(result, self.PASS, message)
 
         # Run the generated program.
         if self._kind == "run":
@@ -244,7 +245,7 @@ class DGTest(DejaGNUTest):
         raise NotImplementedError
         
         
-    def __DGdo(self, line_num, args, context):
+    def _DGdo(self, line_num, args, context):
         """Emulate the 'dg-do' command.
 
         'line_num' -- The line number at which the command was found.
@@ -277,7 +278,7 @@ class DGTest(DejaGNUTest):
         self._kind = kind
 
 
-    def __DGfinal(self, line_num, args, context):
+    def _DGfinal(self, line_num, args, context):
         """Emulate the 'dg-final' command.
 
         'line_num' -- The line number at which the command was found.
@@ -294,7 +295,7 @@ class DGTest(DejaGNUTest):
         self._final_commands.append((words[0], words[1:]))
             
         
-    def __DGoptions(self, line_num, args, context):
+    def _DGoptions(self, line_num, args, context):
         """Emulate the 'dg-options' command.
 
         'line_num' -- The line number at which the command was found.
@@ -317,7 +318,7 @@ class DGTest(DejaGNUTest):
             self._options = args[0]
 
 
-    def __DGbogus(self, line_num, args, context):
+    def _DGbogus(self, line_num, args, context):
         """Emulate the 'dg-warning' command.
 
         'line_num' -- The number at which the command was found.
@@ -330,7 +331,7 @@ class DGTest(DejaGNUTest):
         self.__ExpectDiagnostic(self.__DIAG_BOGUS, line_num, args, context)
 
 
-    def __DGwarning(self, line_num, args, context):
+    def _DGwarning(self, line_num, args, context):
         """Emulate the 'dg-warning' command.
 
         'line_num' -- The number at which the command was found.
@@ -343,7 +344,7 @@ class DGTest(DejaGNUTest):
         self.__ExpectDiagnostic(self.__DIAG_WARNING, line_num, args, context)
 
         
-    def __DGerror(self, line_num, args, context):
+    def _DGerror(self, line_num, args, context):
         """Emulate the 'dg-error' command.
 
         'line_num' -- The number at which the command was found.
@@ -409,8 +410,10 @@ class DGTest(DejaGNUTest):
 
         This function emulates dg-process-target."""
 
-        # Split the selector into words.
-        words = self._ParseTclWords(selector)
+        # Split the selector into words.  In the DejaGNU code, this
+        # operation is accomplished by treating the string as Tcl
+        # list.
+        words = selector.split()
         # Check the first word.
         if words[0] != "target" and words[0] != "xfail":
             raise QMException, "Invalid selector."
