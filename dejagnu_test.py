@@ -15,7 +15,9 @@
 # Imports
 ########################################################################
 
+import os
 import qm
+from   qm.executable import TimeoutRedirectedExecutable
 from   qm.test.test import Test
 from   qm.test.result import Result
 
@@ -63,6 +65,75 @@ class DejaGNUTest(Test):
         }
     """A map from DejaGNU outcomes to QMTest outcomes."""
 
+    executable_timeout = 300
+    """The number of seconds a program is permitted to run on the target."""
+
+    class TargetExecutable(TimeoutRedirectedExecutable):
+        """A '__TargetExecutable' runs on the target system.
+
+        Classes derived from 'DejaGNUTest' may provide derived
+        versions of this class."""
+
+        def __init__(self, timeout):
+
+            # Initialize the base class.
+            TimeoutRedirectedExecutable.__init__(self, 10)
+
+
+        def _StdinPipe(self):
+
+            # No input is provided to the program.
+            return None
+
+        
+        def _StderrPipe(self):
+
+            # Combine stdout/stderr into a single stream.
+            return None
+            
+    
+
+    def _GetTargetEnvironment(self, context):
+        """Return additional environment variables to set on the target.
+
+        'context' -- The 'Context' in which this test is running.
+        
+        returns -- A map from strings (environment variable names) to
+        strings (values for those variables).  These new variables are
+        added to the environment when a program executes on the
+        target."""
+
+        return {}
+    
+
+    def _RunTargetExecutable(self, context, result, file):
+        """Run 'file' on the target.
+
+        'context' -- The 'Context' in which this test is running.
+        
+        'result' -- The 'Result' of this test.
+        
+        'file' -- The path to the executable file.
+
+        returns -- One of the 'dejagnu_outcomes'."""
+
+        executable \
+            = self.TargetExecutable(self.executable_timeout)
+        command = [file]
+        index = self._RecordCommand(result, command)
+        environment = self._GetTargetEnvironment(context)
+        status = executable.Run([file], environment)
+        output = executable.stdout
+        self._RecordCommandOutput(result, index, status, output)
+        # Figure out whether the execution was successful.
+        if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
+            outcome = self.PASS
+        else:
+            outcome = self.FAIL
+
+        return outcome
+        
+        
     def _RecordCommand(self, result, command):
         """Record the execution of 'command'.
 
@@ -170,6 +241,14 @@ class DejaGNUTest(Test):
         the compiler will run."""
 
         return context["DejaGNUTest.target"]
+    
+
+    def _GetTmpdir(self):
+        """Return the path to the temporary directory.
+
+        returns -- The path to the temporary directory."""
+
+        return "/tmp"
     
         
     def _SetUp(self, context):

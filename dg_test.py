@@ -18,7 +18,6 @@
 from   dejagnu_test import DejaGNUTest
 import fnmatch
 import os
-from   qm.executable import TimeoutRedirectedExecutable
 from   qm.test.result import Result
 import re
 
@@ -61,35 +60,10 @@ class DGTest(DejaGNUTest):
         }
     """A map from dg diagnostic kinds to descriptive strings."""
     
-    executable_timeout = 300
-    """The number of seconds a program is permitted to run on the target."""
-
-    class TargetExecutable(TimeoutRedirectedExecutable):
-        """A '__TargetExecutable' runs on the target system.
-
-        Classes derived from 'DejaGNUTest' may provide derived
-        versions of this class."""
-
-        def __init__(self, timeout):
-
-            # Initialize the base class.
-            TimeoutRedirectedExecutable.__init__(self, 10)
-
-
-        def _StdinPipe(self):
-
-            # No input is provided to the program.
-            return None
-
-        
-        def _StderrPipe(self):
-
-            # Combine stdout/stderr into a single stream.
-            return None
-            
-    
-
-    def _RunDGTest(self, default_options, context, result):
+    def _RunDGTest(self, default_options, context, result,
+                   path = None,
+                   default_kind = KIND_COMPILE,
+                   keep_output = 0):
         """Run a 'dg' test.
 
         'default_options' -- A string giving a default set of options
@@ -101,10 +75,18 @@ class DGTest(DejaGNUTest):
 
         'result' -- The 'Result' of the test execution.
 
+        'path' -- The path to the test file.  If 'None', the main test
+        file path is used.
+        
+        'default_kind' -- The kind of test to perform.
+
+        'keep_output' -- True if the output file should be retained
+        after the test is complete.  Otherwise, it is removed.
+
         This function emulates 'dg-test'."""
         
         # Intialize.
-        self._kind = "compile"
+        self._kind = default_kind
         self._selected = None
         self._expectation = None
         self._options = default_options
@@ -112,7 +94,13 @@ class DGTest(DejaGNUTest):
         self._final_commands = []
         # Iterate through the test looking for embedded commands.
         line_num = 0
-        path = self._GetSourcePath()
+        if not path:
+            path = self._GetSourcePath()
+        root = self.GetDatabase().GetRoot()
+        if path.startswith(root):
+            self._name = path[len(root) + 1:]
+        else:
+            self._name = os.path.basename(path)
         for l in open(path).xreadlines():
             line_num += 1
             m = self.__dg_command_regexp.search(l)
@@ -125,11 +113,11 @@ class DGTest(DejaGNUTest):
         if self._selected == 0:
             self._RecordDejaGNUOutcome(result,
                                        self.UNSUPPORTED,
-                                       self.GetId())
+                                       self._name)
             return
 
         # Run the tool being tested.
-        output, file = self._RunTool(self._kind, self._options, context,
+        output, file = self._RunTool(path, self._kind, self._options, context,
                                      result)
 
         # Check to see if the right diagnostic messages appeared.
@@ -150,7 +138,7 @@ class DGTest(DejaGNUTest):
                                       "", output)
             # Record an appropriate test outcome.
             message = ("%s %s (test for %s, line %s)"
-                       % (self.GetId(), c,
+                       % (self._name, c,
                           self.__diagnostic_descriptions[k], ldesc))
             if matched:
                 outcome = self.PASS
@@ -164,34 +152,23 @@ class DGTest(DejaGNUTest):
         # Remove leading blank lines.
         output = re.sub(r"\n+", "", output)
         # If there's any output left, the test fails.
-        message = self.GetId() + " (test for excess errors)"
+        message = self._name + " (test for excess errors)"
         if output != "":
-            self._RecordDejaGNUOutcome(result, self.FAIL, message)
+            outcome = self.FAIL
         else:
-            self._RecordDejaGNUOutcome(result, self.PASS, message)
+            outcome = self.PASS
+        self._RecordDejaGNUOutcome(result, outcome, message)
 
         # Run the generated program.
         if self._kind == "run":
             if not os.path.exists(file):
-                message = (self.GetId()
+                message = (self._name
                            + " compilation failed to produce executable")
                 self._RecordDejaGNUOutcome(result, self.WARNING, message)
             else:
-                executable \
-                    = self.TargetExecutable(self.executable_timeout)
-                command = [file]
-                index = self._RecordCommand(result, command)
-                environment = self._GetTargetEnvironment(context)
-                status = executable.Run([file], environment)
-                output = executable.stdout
-                self._RecordCommandOutput(result, index, status, output)
-                # Figure out whether the execution was successful.
-                if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
-                    outcome = self.PASS
-                else:
-                    outcome = self.FAIL
+                outcome = self._RunTargetExecutable(context, result, file)
                 # Add an annotation indicating what happened.
-                message = self.GetId() + " execution test"
+                message = self._name + " execution test"
                 self._RecordDejaGNUOutcome(result, outcome, message,
                                            self._expectation)
 
@@ -200,10 +177,11 @@ class DGTest(DejaGNUTest):
             self._ExecuteFinalCommand(c, a, context, result)
 
         # Remove the output file.
-        try:
-            os.remove(file)
-        except:
-            pass
+        if not keep_output:
+            try:
+                os.remove(file)
+            except:
+                pass
                 
 
     def _ExecuteFinalCommand(self, command, args, context, result):
@@ -221,19 +199,6 @@ class DGTest(DejaGNUTest):
         raise NotImplementedError
         
         
-    def _GetTargetEnvironment(self, context):
-        """Return additional environment variables to set on the target.
-
-        'context' -- The 'Context' in which this test is running.
-        
-        returns -- A map from strings (environment variable names) to
-        strings (values for those variables).  These new variables are
-        added to the environment when a program executes on the
-        target."""
-
-        return {}
-    
-
     def _PruneOutput(self, output):
         """Remove unintersting messages from 'output'.
 
@@ -247,9 +212,11 @@ class DGTest(DejaGNUTest):
         raise NotImplementedError
     
         
-    def _RunTool(self, kind, options, context, result):
+    def _RunTool(self, path, kind, options, context, result):
         """Run the tool being tested.
 
+        'path' -- The path to the test file.
+        
         'kind' -- The kind of test to perform.
 
         'options' -- A string giving command-line options to provide

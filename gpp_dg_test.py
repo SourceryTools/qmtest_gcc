@@ -17,6 +17,7 @@
 
 from   compiler import Compiler
 from   dg_test import DGTest
+import gpp
 import os
 from   qm.executable import Filter
 import re
@@ -31,18 +32,30 @@ class GPPDGTest(DGTest):
     This test class emulates the 'g++-dg.exp' source file in the GCC
     testsuite."""
 
-    __compilation_mode_map = {
-        DGTest.KIND_PREPROCESS : (Compiler.MODE_PREPROCESS, ".i"),
-        DGTest.KIND_COMPILE : (Compiler.MODE_COMPILE, ".s"),
-        DGTest.KIND_ASSEMBLE : (Compiler.MODE_ASSEMBLE, ".o"),
-        DGTest.KIND_LINK: (Compiler.MODE_LINK, ".exe"),
-        DGTest.KIND_RUN : (Compiler.MODE_LINK, ".exe")
+    KIND_PRECOMPILE = "precompile"
+    
+    __extension_map = {
+        DGTest.KIND_PREPROCESS : ".i",
+        DGTest.KIND_COMPILE : ".s",
+        DGTest.KIND_ASSEMBLE : ".o",
+        DGTest.KIND_LINK: ".exe",
+        DGTest.KIND_RUN : ".exe",
+        KIND_PRECOMPILE : ".gch",
         }
-    """A map from dg-do keywords to compilation modes and extensions.
+    """A map from dg-do keywords to extensions.
 
-    The compilation mode indicates how the file should be compiled.
     The extension indicates what filename extension should be used for
     the output file."""
+
+    __test_kind_map = {
+        DGTest.KIND_PREPROCESS : gpp.KIND_PREPROCESS,
+        DGTest.KIND_COMPILE : gpp.KIND_COMPILE,
+        DGTest.KIND_ASSEMBLE : gpp.KIND_ASSEMBLE,
+        DGTest.KIND_LINK : gpp.KIND_EXECUTABLE,
+        DGTest.KIND_RUN : gpp.KIND_EXECUTABLE,
+        KIND_PRECOMPILE : gpp.KIND_PRECOMPILE
+        }
+    """A map from dg-do keywords to 'gpp' compilation kinds."""
 
     __default_options = "-ansi -pedantic-errors -Wno-long-long"
     """The default set of compiler options to use when running tests."""
@@ -84,8 +97,7 @@ class GPPDGTest(DGTest):
 
             # See if the pattern appears in the output.
             pattern = args[0]
-            mode, output \
-                = self.__GetCompilationModeAndOutputFile(self.KIND_COMPILE)
+            output = self.__GetOutputFile(self.KIND_COMPILE, self.GetId())
             output = open(output).read()
             # Run the output through the demangler, if necessary.
             if command in ("scan-assembler-dem", "scan-assembler-dem-not"):
@@ -102,7 +114,7 @@ class GPPDGTest(DGTest):
                 outcome = self.FAIL
             else:
                 outcome = self.PASS
-            message = self.GetId() + " command " + pattern
+            message = self._name + " command " + pattern
             self._RecordDejaGNUOutcome(result, outcome, message, expectation)
         else:
             return DGTest._ExecuteFinalCommand(self, command, args,
@@ -111,19 +123,7 @@ class GPPDGTest(DGTest):
         
     def _GetTargetEnvironment(self, context):
 
-        env = {}
-        dirs = ":".join(context["GPPInit.library_directories"])
-        for v in ("LD_LIBRARY_PATH",
-                  "SHLIB_PATH",
-                  "LD_LIBRARY_N32_PATH",
-                  "LD_LIBRARY64_PATH"):
-            val = os.environ.get(v, "")
-            if val:
-                env[v] = val + ":" + dirs
-            else:
-                env[v] = dirs
-
-        return env
+        return gpp.get_target_environment(context)
             
 
     def _PruneOutput(self, output):
@@ -132,97 +132,42 @@ class GPPDGTest(DGTest):
         return re.sub(self.__prune_regexp, "", output)
         
         
-    def _RunTool(self, kind, options, context, result):
+    def _RunTool(self, path, kind, options, context, result):
 
         # This method emulates g++-dg-test.
 
-        mode, file = self.__GetCompilationModeAndOutputFile(kind)
-        output = self._Compile(context, result,
-                               [self._GetSourcePath()],
-                               file,
-                               mode,
-                               options.split())
+        file = self.__GetOutputFile(kind, path)
+        kind = self.__test_kind_map[kind]
+        output = gpp.compile(context, result,
+                             [path],
+                             file,
+                             kind,
+                             options.split(),
+                             self)
             
         return (output, file)
 
-
-    def _Compile(self, context, result, source_files, output_file,
-                 mode, options):
-        """Compile 'source_file'.
-
-        'result' -- The QMTest 'Result' for the test.
         
-        'context' -- The 'Context' in which the test is running.
-        
-        'source_file' -- A list of paths giving the source files to be
-        compiled.
-
-        'output_file' -- The name of the output file to be created.
-
-        'mode' -- One of the 'Compiler.modes'.
-
-        'options' -- A list of additional command-line options to be
-        provided to the compiler.
-
-        returns -- The output produced by the compiler."""
-
-        # This method emulates g++_target_compile (in the GCC
-        # testsuite), and target_compile (in the DejaGNU distribution).
-
-        # There are a lot of complexities in default_target_compile
-        # which we do not presently attempt to emulate.
-        # Form the command-line.  Using Compiler.GetCompilationCommand
-        # isn't guaranteed to create exactly the same command used by
-        # DejaGNU, so we form the command manually.
-        compiler = context["CompilerTable.compiler_table"]["cplusplus"]
-        command = [compiler.GetPath()]
-        # Add the global options (as originally specified in the
-        # context file).  These are added before the options for this
-        # test so that the latter can override the former.
-        command += context["GPPInit.options"]
-        command += options
-        # Add the source files.
-        if mode != Compiler.MODE_ASSEMBLE:
-            command += source_files
-        # Indicate the compilation mode.
-        command += compiler._GetModeSwitches(mode)
-        # For an executable test, provide necessary -L options.
-        if mode == Compiler.MODE_LINK:
-            command += map(lambda d: "-L" + d,
-                           context["GPPInit.library_directories"])
-        # Indicate where the output should go.
-        command += ["-o", output_file]
-        # Add the source files if they have not already been added.
-        if mode == Compiler.MODE_ASSEMBLE:
-            command += source_files
-
-        # Run the compiler.
-        index = self._RecordCommand(result, command)
-        status, output = compiler.ExecuteCommand(None, command)
-        self._RecordCommandOutput(result, index, status, output)
-                    
-        # If there was no output, DejaGNU uses the exit status.
-        if not output and status != 0:
-            output = "exit statis is %d" % status
-
-        return output
-
-        
-    def __GetCompilationModeAndOutputFile(self, kind):
+    def __GetOutputFile(self, kind, path = None):
         """Return the compilation mode and output file name for the test.
 
         'kind' -- The kind of test being performed; one of
         'DGTest.__test_kinds'.
+
+        'path' -- The path to the file being compiled.  If 'None', the
+        primary source path is used.
         
         returns -- A pair '(mode, file)' where 'mode' is one of the
         'Compiler.modes' and 'file' is the name of the output file
         generated."""
         
-        mode, ext = self.__compilation_mode_map[kind]
-        file = os.path.basename(self._GetSourcePath())
-        file = os.path.splitext(file)[0] + ext
+        ext = self.__extension_map[kind]
+        file = os.path.basename(path)
+        if kind != self.KIND_PRECOMPILE:
+            file = os.path.splitext(file)[0]
+        file += ext
         if kind == self.KIND_RUN:
             file = os.path.join(".", file)
 
-        return mode, file
+        return file
         

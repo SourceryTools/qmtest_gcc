@@ -67,6 +67,14 @@ class GPPDatabase(ExtensionDatabase):
         ]
     
     __test_class_map = (
+        (os.path.join("g++.dg", "bprob"),
+         "gpp_profile_test.GPPProfileTest"),
+        (os.path.join("g++.dg", "tls"),
+         "gpp_dg_tls_test.GPPDGTLSTest"),
+        (os.path.join("g++.dg", "debug"),
+         "gpp_dg_debug_test.GPPDGDebugTest"),
+        (os.path.join("g++.dg", "pch"),
+         "gpp_dg_pch_test.GPPDGPCHTest"),
         ("g++.dg", "gpp_dg_test.GPPDGTest"),
         ("g++.old-deja", "old_dejagnu_test.OldDejaGNUTest")
         )
@@ -97,6 +105,17 @@ class GPPDatabase(ExtensionDatabase):
                                       "gpp_init.GPPInit",
                                       { Runnable.RESOURCE_FIELD_ID :
                                         ["compiler_table"] })
+        elif resource_id == os.path.join("g++.dg", "tls", "init"):
+            return ResourceDescriptor(self, resource_id,
+                                      "gpp_tls_init.GPPTLSInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["gpp_init"] })
+        elif resource_id == os.path.join("g++.dg", "debug", "init"):
+            return ResourceDescriptor(self, resource_id,
+                                      "gpp_debug_init.GPPDebugInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["gpp_init"] })
+            
 
         raise database.NoSuchResourceError, resource_id
         
@@ -131,13 +150,18 @@ class GPPDatabase(ExtensionDatabase):
                                 basename, path,
                                 self.GetAttachmentStore())
 
+        # All tests depend on gpp_init.
+        resources = ["gpp_init"]
+        # The TLS tests depend on tls_init.
+        if test_id.startswith(os.path.join("g++.dg", "tls")):
+            resources.append(os.path.join("g++.dg", "tls", "init"))
+        elif test_id.startswith(os.path.join("g++.dg", "debug")):
+            resources.append(os.path.join("g++.dg", "debug", "init"))
         # Create the test descriptor.
         descriptor = TestDescriptor(self, test_id, test_class,
                                     { 'source_file' : attachment,
-                                      # All tests depend on the
-                                      # compiler table.
                                       Runnable.RESOURCE_FIELD_ID :
-                                        ["gpp_init"] })
+                                        resources })
 
         return descriptor
         
