@@ -86,13 +86,19 @@ class GPPDatabase(ExtensionDatabase):
         
     def GetResource(self, resource_id):
 
-        # There is only one resource.
-        if resource_id != "compiler_table":
-            raise database.NoSuchResourceError, resource_id
+        # There are two special resources that are used for
+        # initialization.
+        if resource_id == "compiler_table":
+            return ResourceDescriptor(self, resource_id,
+                                      "compiler_table.CompilerTable",
+                                      {})
+        elif resource_id == "gpp_init":
+            return ResourceDescriptor(self, resource_id,
+                                      "gpp_init.GPPInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["compiler_table"] })
 
-        return ResourceDescriptor(self, resource_id,
-                                  "compiler_table.CompilerTable",
-                                  {})
+        raise database.NoSuchResourceError, resource_id
         
         
     def GetRoot(self):
@@ -131,7 +137,7 @@ class GPPDatabase(ExtensionDatabase):
                                       # All tests depend on the
                                       # compiler table.
                                       Runnable.RESOURCE_FIELD_ID :
-                                        ["compiler_table"] })
+                                        ["gpp_init"] })
 
         return descriptor
         
