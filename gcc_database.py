@@ -78,7 +78,7 @@ class GPPDatabase(ExtensionDatabase):
         (os.path.join("g++.dg", "pch"),
          "gpp_dg_pch_test.GPPDGPCHTest"),
         ("g++.dg", "gpp_dg_test.GPPDGTest"),
-        ("g++.old-deja", "old_dejagnu_test.OldDejaGNUTest")
+        ("g++.old-deja", "gpp_dg_test.GPPDGTest")
         )
     """A map from test name prefixes to test classes.
 
