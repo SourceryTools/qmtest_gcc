@@ -25,6 +25,8 @@ from   qm.test.file_database import FileDatabase
 from   qm.test.directory_suite import DirectorySuite
 from   qm.test.runnable import Runnable
 
+import maximal_prefix
+
 ########################################################################
 # Classes
 ########################################################################
@@ -54,53 +56,38 @@ class GCCDatabase(FileDatabase):
             ),
         ]
     
-    __test_class_map = (
-        (os.path.join("gcc.c-torture", "compile"),
-         "gcc_dg_test.GCCCTortureCompileTest"),
-        (os.path.join("gcc.c-torture", "unsorted"),
-         "gcc_dg_test.GCCCTortureCompileTest"),
-        (os.path.join("gcc.dg", "compat"),
-         "compat_test.GCCCompatTest"),
-        (os.path.join("gcc.dg", "cpp", "trad"),
-         "gcc_dg_test.GCCDGCPPTradTest"),
-        (os.path.join("gcc.dg", "cpp"),
-         "gcc_dg_test.GCCDGCPPTest"),
-        (os.path.join("gcc.dg", "debug"),
-         "debug_test.GCCDGDebugTest"),
-        (os.path.join("gcc.dg", "format"),
-         "gcc_dg_test.GCCDGFormatTest"),
-        (os.path.join("gcc.dg", "noncompile"),
-         "gcc_dg_test.GCCDGNoncompileTest"),
-        (os.path.join("gcc.dg", "pch"),
-         "dg_pch_test.GCCDGPCHTest"),
-        (os.path.join("gcc.dg", "tls"),
-         "dg_tls_test.GCCDGTLSTest"),
-        (os.path.join("gcc.dg", "torture"),
-         "gcc_dg_test.GCCDGTortureTest"),
-        ("gcc.dg",
-         "gcc_dg_test.GCCDGTest"),
-        (os.path.join("g++.dg", "bprob"),
-         "gpp_profile_test.GPPProfileTest"),
-        (os.path.join("g++.dg", "tls"),
-         "dg_tls_test.GPPDGTLSTest"),
-        (os.path.join("g++.dg", "compat"),
-         "compat_test.GPPCompatTest"),
-        (os.path.join("g++.dg", "debug"),
-         "debug_test.GPPDGDebugTest"),
-        (os.path.join("g++.dg", "gcov"),
-         "gpp_gcov_test.GPPGCOVTest"),
-        (os.path.join("g++.dg", "pch"),
-         "dg_pch_test.GPPDGPCHTest"),
-        ("g++.dg",
-         "gpp_dg_test.GPPDGTest"),
-        ("g++.old-deja",
-         "gpp_old_deja_test.GPPOldDejaTest")
-        )
+    _j = os.path.join
+    __test_class_map = {
+        # GCC tests:
+        "gcc.dg": "gcc_dg_test.GCCDGTest",
+        _j("gcc.c-torture", "compile"):
+            "gcc_dg_test.GCCCTortureCompileTest",
+        _j("gcc.c-torture", "unsorted"):
+            "gcc_dg_test.GCCCTortureCompileTest",
+        _j("gcc.dg", "compat"): "compat_test.GCCCompatTest",
+        _j("gcc.dg", "cpp", "trad"): "gcc_dg_test.GCCDGCPPTradTest",
+        _j("gcc.dg", "cpp"): "gcc_dg_test.GCCDGCPPTest",
+        _j("gcc.dg", "debug"): "debug_test.GCCDGDebugTest",
+        _j("gcc.dg", "format"): "gcc_dg_test.GCCDGFormatTest",
+        _j("gcc.dg", "noncompile"): "gcc_dg_test.GCCDGNoncompileTest",
+        _j("gcc.dg", "pch"): "dg_pch_test.GCCDGPCHTest",
+        _j("gcc.dg", "tls"): "dg_tls_test.GCCDGTLSTest",
+        _j("gcc.dg", "torture"): "gcc_dg_test.GCCDGTortureTest", 
+        # G++ tests:
+        "g++.dg": "gpp_dg_test.GPPDGTest",
+        _j("g++.dg", "bprob"): "gpp_profile_test.GPPProfileTst",
+        _j("g++.dg", "tls"): "dg_tls_test.GPPDGTLSTet",
+        _j("g++.dg", "compat"): "compat_test.GPPCompatTest",
+        _j("g++.dg", "debug"): "debug_test.GPPDGDebugTest",
+        _j("g++.dg", "gcov"): "gpp_gcov_test.GPPGCOVTest",
+        _j("g++.dg", "pch"): "dg_pch_test.GPPDGPCHTest",
+        "g++.old-deja": "gpp_old_deja_test.GPPOldDejaTest"
+        }
     """A map from test name prefixes to test classes.
 
     The databases determines which test class to use for a particular
-    test by scanning this list.  The test class used is the one
-    associated with the first matching prefix."""
+    test by finding the longest entry in this table which is a prefix of
+    the test's filename."""
 
     def __init__(self, path, arguments):
 
@@ -108,6 +95,9 @@ class GCCDatabase(FileDatabase):
         super(GCCDatabase, self).__init__(path, arguments)
         # Create an attachment store.
         self.__store = FileAttachmentStore()
+        # Create the prefix matcher.
+        self.__matcher = maximal_prefix.MaximalPrefixMatcher()
+        self.__matcher.add(self.__test_class_map)
 
         
     def GetResource(self, resource_id):
@@ -184,9 +174,8 @@ class GCCDatabase(FileDatabase):
 
         # Figure out which test class to use.
         p = path[len(self.GetRoot()) + 1:]
-        for prefix, test_class in self.__test_class_map:
-            if p.startswith(prefix):
-                break
+        prefix = self.__matcher[p]
+        test_class = self.__test_class_map[prefix]
 
         # Construct the attachment representing the primary source
         # file.
