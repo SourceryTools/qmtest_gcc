@@ -21,7 +21,7 @@ import os
 import qm
 from   qm.attachment import Attachment, FileAttachmentStore
 from   qm.test.database import ResourceDescriptor, TestDescriptor
-from   qm.test.file_database import ExtensionDatabase
+from   qm.test.file_database import FileDatabase
 from   qm.test.directory_suite import DirectorySuite
 from   qm.test.runnable import Runnable
 
@@ -29,7 +29,7 @@ from   qm.test.runnable import Runnable
 # Classes
 ########################################################################
 
-class GPPDatabase(ExtensionDatabase):
+class GCCDatabase(FileDatabase):
     """A 'GPPDatabase' stores the G++ regression tests."""
 
     arguments = [
@@ -52,21 +52,15 @@ class GPPDatabase(ExtensionDatabase):
             default_value = "false",
             computed = "true",
             ),
-        # Tests use the ".C" extension.
-        qm.fields.TextField(
-            name = "test_extension",
-            default_value = ".C",
-            computed = "true",
-            ),
-        # Suites have no extension.
-        qm.fields.TextField(
-            name = "suite_extension",
-            default_value = "",
-            computed = "true",
-            ),
         ]
     
     __test_class_map = (
+        (os.path.join("gcc.dg", "noncompile"),
+         "gcc_dg_test.GCCDGNoncompileTest"),
+        (os.path.join("gcc.dg", "debug"),
+         "debug_test.GCCDGDebugTest"),
+        ("gcc.dg",
+         "gcc_dg_test.GCCDGTest"),
         (os.path.join("g++.dg", "bprob"),
          "gpp_profile_test.GPPProfileTest"),
         (os.path.join("g++.dg", "tls"),
@@ -74,13 +68,15 @@ class GPPDatabase(ExtensionDatabase):
         (os.path.join("g++.dg", "compat"),
          "gpp_compat_test.GPPCompatTest"),
         (os.path.join("g++.dg", "debug"),
-         "gpp_dg_debug_test.GPPDGDebugTest"),
+         "debug_test.GPPDGDebugTest"),
         (os.path.join("g++.dg", "gcov"),
          "gpp_gcov_test.GPPGCOVTest"),
         (os.path.join("g++.dg", "pch"),
          "gpp_dg_pch_test.GPPDGPCHTest"),
-        ("g++.dg", "gpp_dg_test.GPPDGTest"),
-        ("g++.old-deja", "gpp_old_deja_test.GPPOldDejaTest")
+        ("g++.dg",
+         "gpp_dg_test.GPPDGTest"),
+        ("g++.old-deja",
+         "gpp_old_deja_test.GPPOldDejaTest")
         )
     """A map from test name prefixes to test classes.
 
@@ -91,15 +87,13 @@ class GPPDatabase(ExtensionDatabase):
     def __init__(self, path, arguments):
 
         # Initialize the base class.
-        ExtensionDatabase.__init__(self, path, arguments)
+        super(GCCDatabase, self).__init__(path, arguments)
         # Create an attachment store.
         self.__store = FileAttachmentStore(self)
 
         
     def GetResource(self, resource_id):
 
-        # There are two special resources that are used for
-        # initialization.
         if resource_id == "compiler_table":
             return ResourceDescriptor(self, resource_id,
                                       "compiler_table.CompilerTable",
@@ -116,9 +110,14 @@ class GPPDatabase(ExtensionDatabase):
                                         ["gpp_init"] })
         elif resource_id == os.path.join("g++.dg", "debug", "init"):
             return ResourceDescriptor(self, resource_id,
-                                      "gpp_debug_init.GPPDebugInit",
+                                      "debug_test.GPPDebugInit",
                                       { Runnable.RESOURCE_FIELD_ID :
                                         ["gpp_init"] })
+        elif resource_id == os.path.join("gcc.dg", "debug", "init"):
+            return ResourceDescriptor(self, resource_id,
+                                      "debug_test.GCCDebugInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["compiler_table"] })
             
 
         raise database.NoSuchResourceError, resource_id
@@ -154,13 +153,20 @@ class GPPDatabase(ExtensionDatabase):
                                 basename, path,
                                 self.GetAttachmentStore())
 
-        # All tests depend on gpp_init.
-        resources = ["gpp_init"]
+        resources = []
+        
+        # All G++ tests depend on gpp_init.
+        if test_id.startswith("g++."):
+            resources.append("gpp_init")
+        elif test_id.startswith("gcc."):
+            resources.append("compiler_table")
         # The TLS tests depend on tls_init.
         if test_id.startswith(os.path.join("g++.dg", "tls")):
             resources.append(os.path.join("g++.dg", "tls", "init"))
         elif test_id.startswith(os.path.join("g++.dg", "debug")):
             resources.append(os.path.join("g++.dg", "debug", "init"))
+        elif test_id.startswith(os.path.join("gcc.dg", "debug")):
+            resources.append(os.path.join("gcc.dg", "debug", "init"))
         # Create the test descriptor.
         descriptor = TestDescriptor(self, test_id, test_class,
                                     { 'source_file' : attachment,
@@ -173,22 +179,26 @@ class GPPDatabase(ExtensionDatabase):
         
     def _IsFile(self, kind, path):
 
-        val = ExtensionDatabase._IsFile(self, kind, path)
-        if not val:
+        # Suites are directories.
+        if kind == self.SUITE:
+            return os.path.isdir(path)
+
+        # No resources are stored in files.
+        if kind == self.RESOURCE:
             return 0
-        
-        # Non-directories are not suites.
-        if kind == ExtensionDatabase.SUITE and not os.path.isdir(path):
-            return 0
+
+        rel_path = path[len(self.GetRoot()):]
+        if rel_path.startswith(os.path.join(os.sep, "gcc")):
+            return os.path.splitext(path)[1] == ".c"
 
         # In the g++.dg/compat subdirectory, only tests that end with
         # _main.C are tests.
-        if kind == ExtensionDatabase.TEST:
-            rel_path = path[len(self.GetRoot()):]
-            if (rel_path.startswith(os.sep + os.path.join("g++.dg", "compat"))
-                and not rel_path.endswith("_main.C")):
-                return 0
+        if rel_path.startswith(os.sep + os.path.join("g++.dg", "compat")):
+            return rel_path.endswith("_main.C")
+                            
+        if rel_path.startswith(os.path.join(os.sep, "g++")):
+            return os.path.splitext(path)[1] == ".C"
 
-        return val
+        return 0
     
             

@@ -15,14 +15,14 @@
 # Imports
 ########################################################################
 
-import gpp
+from   gpp_test_base import GPPTestBase
 from   profile_test import ProfileTest
 
 ########################################################################
 # Classes
 ########################################################################
 
-class GPPProfileTest(ProfileTest):
+class GPPProfileTest(ProfileTest, GPPTestBase):
     """A 'GPPProfileTest' is a G++ profiling test."""
 
     prof_ext = ".da"
@@ -34,10 +34,11 @@ class GPPProfileTest(ProfileTest):
     def _Compile(self, context, result, source_files, output_file,
                  mode, options):
 
-        return gpp.compile(context, result, source_files, output_file, mode,
-                           options, self)
+        return GPPTestBase._Compile(self, context, result,
+                                    source_files, output_file, mode,
+                                    options)
 
 
     def _GetTargetEnvironment(self, context):
 
-        return gpp.get_target_environment(context)
+        return GPPTestBase._GetTargetEnvironment(self, context)

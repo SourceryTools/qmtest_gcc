@@ -203,13 +203,5 @@ class CompatTest(DejaGNUTest):
         if outcome == self.PASS:
             os.remove(dest)
         self._RecordDejaGNUOutcome(result, outcome, exec_message)
-                
-        
-    def _Compile(self, context, result, source, dest, mode, options):
-
-        raise NotImplementedError
     
                  
-    def _CheckCompile(self, result, testcase, option, objname, gcc_output):
-
-        raise NotImplementedError

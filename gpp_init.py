@@ -17,6 +17,7 @@
 
 from   compiler import CompilerExecutable
 from   compiler_table import CompilerTable
+from   dejagnu_base import DejaGNUBase
 from   qm.executable import RedirectedExecutable
 from   qm.test.resource import Resource
 import os
@@ -25,7 +26,7 @@ import os
 # Classes
 ########################################################################
 
-class GPPInit(Resource):
+class GPPInit(Resource, DejaGNUBase):
     """A 'GPPInit' resource stores information for G++ tests.
 
     Every test in the database depends on a 'DejaGNUCompilerTable'
@@ -33,6 +34,8 @@ class GPPInit(Resource):
 
     def SetUp(self, context, result):
 
+        super(GPPInit, self)._SetUp(context)
+        
         # Find the ordinary compiler table.
         compilers = context["CompilerTable.compiler_table"]
 
@@ -86,6 +89,7 @@ class GPPInit(Resource):
         # of -L options) and at run-time (in LD_LIBRARY_PATH).
         lib_dirs = []
         lib_dirs.append(os.path.join(v3_directory, "src", ".libs"))
+        lib_dirs.append(os.path.join(objdir, "gcc"))
         context["GPPInit.library_directories"] = lib_dirs
     
 

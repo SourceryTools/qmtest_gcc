@@ -16,15 +16,16 @@
 ########################################################################
 
 from   compiler import Compiler
+from   dejagnu_base import DejaGNUBase
+from   gpp_test_base import GPPTestBase
 from   qm.test.resource import Resource
 import os
-import gpp
 
 ########################################################################
 # Classes
 ########################################################################
 
-class GPPTLSInit(Resource):
+class GPPTLSInit(Resource, DejaGNUBase, GPPTestBase):
     """A 'GPPTLSInit' stores information for thread-local-storage tests.
 
     Every G++ thread-local-storage test depends on a 'GPPTLSInit'
@@ -38,13 +39,15 @@ class GPPTLSInit(Resource):
     
     def SetUp(self, context, result):
 
+        super(GPPTLSInit, self)._SetUp(context)
+        
         # This method emulates g++.dg/tls.exp.
         trivial_source_file = os.path.join(self.GetDatabase().GetRoot(),
                                            os.path.dirname(self.GetId()),
                                            "trivial.C")
-        output = gpp.compile(context, result,
-                             [trivial_source_file], "trivial.S",
-                             gpp.KIND_COMPILE)
+        output = self._Compile(context, result,
+                               [trivial_source_file], "trivial.S",
+                               self.KIND_COMPILE)
         if output.find("not supported") != -1:
             context[self.SUPPORTED_TAG] = 0
         else:

@@ -54,7 +54,7 @@ class GPPDGPCHTest(GPPDGTest):
                 pass
             shutil.copyfile(os.path.splitext(source)[0] + ".Hs",
                             basename + ".H")
-            self._RunDGTest(o, context, result,
+            self._RunDGTest(o, "", context, result,
                             basename + ".H",
                             self.KIND_PRECOMPILE,
                             keep_output = 1)
@@ -62,13 +62,14 @@ class GPPDGPCHTest(GPPDGTest):
             assembly_outcome = self.UNTESTED
             if os.path.exists(basename + ".H.gch"):
                 os.remove(basename + ".H")
-                self._RunDGTest(o + " -I.", context, result, keep_output = 1)
+                self._RunDGTest(o + " -I.", "", context, result,
+                                keep_output = 1)
                 os.remove(basename + ".H.gch")
                 if os.path.exists(basename + ".s"):
                     os.rename(basename + ".s", basename + ".s-gch")
                     shutil.copyfile(os.path.splitext(source)[0] + ".Hs",
                                     basename + ".H")
-                    self._RunDGTest(o + " -I.", context, result,
+                    self._RunDGTest(o + " -I.", "", context, result,
                                     keep_output = 1)
                     if filecmp.cmp(basename + ".s", basename + ".s-gch"):
                         assembly_outcome = self.PASS
