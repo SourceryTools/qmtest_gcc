@@ -292,7 +292,7 @@ PREREQUISITES
   A Red Hat Package Manager (RPM) distribution of a QMTest snapshot
   that works with this testsuite is available at:
 
-    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040331/qm-20040331-1.noarch.rpm
+    http://www.codesourcery.com/public/qmtest/qm-20040331/qm-20040331-1.noarch.rpm
 
   The RPM is architecture-independent; it can be installed on any
   GNU/Linux system that supports the RPM format.
@@ -300,7 +300,7 @@ PREREQUISITES
   You can also obtain the source for QMTest from CVS by following the
   directions at:
 
-    http://www.codesourcery.com/qm/qmtest_development
+    http://www.codesourcery.com/qmtest/development.html
 
 - GNU Compiler Collection
 
@@ -446,7 +446,7 @@ There are four steps required to run the testsuite:
   QMTest supports a variety of more complex usage scenarios.  For more
   information see the QMTest manual, available at:
 
-    http://www.codesourcery.com/qm/qmtest_manual
+    http://www.codesourcery.com/public/qmtest/qm-2.1.2/manual.html
 
 BASELINE FILES
 ==============
@@ -568,6 +568,7 @@ rm -rf $RPM_BUILD_ROOT
 - Fix bug in computation of symbol baseline paths.
 - Make package relocatable.
 - Document generation of new symbol baseline files.
+- Update QMTest-related URLs in README.
 
 * Mon Mar 29 2004 Nathaniel Smith <njs@codesourcery.com> 
 - Rework for no-compiler version of testsuite.
