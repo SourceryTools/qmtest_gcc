@@ -38,6 +38,9 @@ class GCCInit(Resource, GCCTestBase, DejaGNUBase):
 
     SUPPORTS_GCSEC_CONTEXT_PROPERTY = "GCCInit.supports_gcsec"
     """A context property that is true if --gc-sections is supported."""
+
+    SUPPORTS_DLL_CONTEXT_PROPERTY = "GCCInit.supports_dll"
+    """A context property that is true if DLL attributes are supported."""
     
     def SetUp(self, context, result):
 
@@ -57,7 +60,11 @@ class GCCInit(Resource, GCCTestBase, DejaGNUBase):
              ("int main() {}\n",
               GCCTestBase.KIND_EXECUTABLE,
               ["-Wl,--gc-sections"],
-              self.SUPPORTS_GCSEC_CONTEXT_PROPERTY)):
+              self.SUPPORTS_GCSEC_CONTEXT_PROPERTY),
+             ("void f() __attribute__((dllimport));\n",
+              GCCTestBase.KIND_COMPILE,
+              [],
+              self.SUPPORTS_DLL_CONTEXT_PROPERTY)):
             basename = os.path.join(context.GetTemporaryDirectory(),
                                     self.GetId())
             source_file = basename + ".c"

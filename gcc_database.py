@@ -55,6 +55,10 @@ class GCCDatabase(FileDatabase):
         ]
     
     __test_class_map = (
+        (os.path.join("gcc.c-torture", "compile"),
+         "gcc_dg_test.GCCCTortureCompileTest"),
+        (os.path.join("gcc.c-torture", "unsorted"),
+         "gcc_dg_test.GCCCTortureCompileTest"),
         (os.path.join("gcc.dg", "compat"),
          "compat_test.GCCCompatTest"),
         (os.path.join("gcc.dg", "cpp", "trad"),
@@ -103,7 +107,7 @@ class GCCDatabase(FileDatabase):
         # Initialize the base class.
         super(GCCDatabase, self).__init__(path, arguments)
         # Create an attachment store.
-        self.__store = FileAttachmentStore(self)
+        self.__store = FileAttachmentStore()
 
         
     def GetResource(self, resource_id):
@@ -209,16 +213,20 @@ class GCCDatabase(FileDatabase):
         return descriptor
         
                 
-        
-    def _IsFile(self, kind, path):
 
-        # All directories are suites.
-        if kind == self.SUITE:
-            return os.path.isdir(path)
+    def _IsResourceFile(self, path):
 
         # No resources are stored in files.
-        if kind == self.RESOURCE:
-            return 0
+        return 0
+
+        
+    def _IsSuiteFile(self, path):
+
+        # All directories are suites.
+        return os.path.isdir(path)
+
+        
+    def _IsTestFile(self, path):
 
         rel_path = path[len(self.GetRoot()):]
 
