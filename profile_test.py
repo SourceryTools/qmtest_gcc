@@ -71,9 +71,9 @@ class ProfileTest(DejaGNUTest):
             except:
                 pass
             
-            self._CleanUp(self.prof_ext)
+            self.__CleanUp(self.prof_ext)
             if self.perf_ext:
-                self._CleanUp(self.perf_ext)
+                self.__CleanUp(self.perf_ext)
 
             o = options + [self.profile_option]
             ostr = " ".join(o)
@@ -119,7 +119,7 @@ class ProfileTest(DejaGNUTest):
             if outcome != self.PASS:
                 continue
 
-            self._CleanUp(self.prof_ext)
+            self.__CleanUp(self.prof_ext)
 
             if not self.perf_ext:
                 os.remove(execname2)
@@ -153,7 +153,7 @@ class ProfileTest(DejaGNUTest):
         raise NotImplementedError
 
                  
-    def _CleanUp(self, extension):
+    def __CleanUp(self, extension):
         """Remove profiling data files with the indicated 'extension'
 
         'extension' -- The file name extension (including the leading

@@ -52,10 +52,14 @@ class DGTest(DejaGNUTest):
         )
     """The kinds of tests supported by 'dg.exp'."""
 
+    __DIAG_BOGUS = "bogus"
+    __DIAG_ERROR = "error"
+    __DIAG_WARNING = "warning"
+    
     __diagnostic_descriptions = {
-        "error" : "errors",
-        "warning" : "warnings",
-        "bogus" : "bogus messages",
+        __DIAG_ERROR : "errors",
+        __DIAG_WARNING : "warnings",
+        __DIAG_BOGUS : "bogus messages",
         "build" : "build failure",
         }
     """A map from dg diagnostic kinds to descriptive strings."""
@@ -141,9 +145,16 @@ class DGTest(DejaGNUTest):
                        % (self._name, c,
                           self.__diagnostic_descriptions[k], ldesc))
             if matched:
-                outcome = self.PASS
+                if k == self.__DIAG_BOGUS:
+                    outcome = self.FAIL
+                else:
+                    outcome = self.PASS
             else:
-                outcome = self.FAIL
+                if k == self.__DIAG_BOGUS:
+                    outcome = self.PASS
+                else:
+                    outcome = self.FAIL
+                    
             self._RecordDejaGNUOutcome(result, outcome, message, x)
 
         # Remove tool-specific messages that can be safely ignored.
@@ -306,6 +317,19 @@ class DGTest(DejaGNUTest):
             self._options = args[0]
 
 
+    def __DGbogus(self, line_num, args, context):
+        """Emulate the 'dg-warning' command.
+
+        'line_num' -- The number at which the command was found.
+
+        'args' -- The arguments to the command, as a list of
+        strings.
+
+        'context' -- The 'Context' in which the test is running."""
+        
+        self.__ExpectDiagnostic(self.__DIAG_BOGUS, line_num, args, context)
+
+
     def __DGwarning(self, line_num, args, context):
         """Emulate the 'dg-warning' command.
 
@@ -316,7 +340,7 @@ class DGTest(DejaGNUTest):
 
         'context' -- The 'Context' in which the test is running."""
 
-        self.__ExpectDiagnostic("warning", line_num, args, context)
+        self.__ExpectDiagnostic(self.__DIAG_WARNING, line_num, args, context)
 
         
     def __DGerror(self, line_num, args, context):
@@ -329,7 +353,7 @@ class DGTest(DejaGNUTest):
 
         'context' -- The 'Context' in which the test is running."""
 
-        self.__ExpectDiagnostic("error", line_num, args, context)
+        self.__ExpectDiagnostic(self.__DIAG_ERROR, line_num, args, context)
 
 
     def __ExpectDiagnostic(self, kind, line_num, args, context):
@@ -386,7 +410,7 @@ class DGTest(DejaGNUTest):
         This function emulates dg-process-target."""
 
         # Split the selector into words.
-        words = selector.split()
+        words = self._ParseTclWords(selector)
         # Check the first word.
         if words[0] != "target" and words[0] != "xfail":
             raise QMException, "Invalid selector."

@@ -89,7 +89,7 @@ class GPPDGTest(DGTest):
             # See if there is a target selector applied to this test.
             expectation = self.PASS
             if len(args) > 1:
-                code = self._ParseTargetSelector(args[1])
+                code = self._ParseTargetSelector(args[1], context)
                 if code == "N":
                     return
                 if code == "F":

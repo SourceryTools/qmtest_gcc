@@ -73,6 +73,8 @@ class GPPDatabase(ExtensionDatabase):
          "gpp_dg_tls_test.GPPDGTLSTest"),
         (os.path.join("g++.dg", "debug"),
          "gpp_dg_debug_test.GPPDGDebugTest"),
+        (os.path.join("g++.dg", "gcov"),
+         "gpp_gcov_test.GPPGCOVTest"),
         (os.path.join("g++.dg", "pch"),
          "gpp_dg_pch_test.GPPDGPCHTest"),
         ("g++.dg", "gpp_dg_test.GPPDGTest"),

@@ -39,6 +39,11 @@ class GPPInit(Resource):
         # Get the C++ compiler.
         compiler = compilers["cplusplus"]
 
+        # Tell GCOVTest where the coverage executable is located.
+        gcov = os.path.join(os.path.dirname(compiler.GetPath()),
+                            "gcov")
+        context["GCOVTest.gcov"] = gcov
+        
         # Run the compiler to find out what multilib directory is
         # in use. The DejaGNU code that does this is get_multiblis in
         # libgloss.exp; this version uses a much simpler technique.

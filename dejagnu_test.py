@@ -17,6 +17,7 @@
 
 import os
 import qm
+from   qm.common import QMException
 from   qm.executable import TimeoutRedirectedExecutable
 from   qm.test.test import Test
 from   qm.test.result import Result
@@ -69,7 +70,7 @@ class DejaGNUTest(Test):
     """The number of seconds a program is permitted to run on the target."""
 
     class TargetExecutable(TimeoutRedirectedExecutable):
-        """A '__TargetExecutable' runs on the target system.
+        """A 'TargetExecutable' runs on the target system.
 
         Classes derived from 'DejaGNUTest' may provide derived
         versions of this class."""
@@ -91,7 +92,30 @@ class DejaGNUTest(Test):
             # Combine stdout/stderr into a single stream.
             return None
             
-    
+
+    class BuildExecutable(TimeoutRedirectedExecutable):
+        """A 'BuildExecutable' runs on the build machine.
+
+        Classes derived from 'DejaGNUTest' may provide derived
+        versions of this class."""
+
+        def __init__(self, timeout):
+
+            # Initialize the base class.
+            TimeoutRedirectedExecutable.__init__(self, 10)
+
+
+        def _StdinPipe(self):
+
+            # No input is provided to the program.
+            return None
+
+        
+        def _StderrPipe(self):
+
+            # Combine stdout/stderr into a single stream.
+            return None
+
 
     def _GetTargetEnvironment(self, context):
         """Return additional environment variables to set on the target.
@@ -106,6 +130,31 @@ class DejaGNUTest(Test):
         return {}
     
 
+    def _RunBuildExecutable(self, context, result, file, args = []):
+        """Run 'file' on the target.
+
+        'context' -- The 'Context' in which this test is running.
+        
+        'result' -- The 'Result' of this test.
+        
+        'file' -- The path to the executable file.
+
+        'args' -- The arguments to the 'file'.
+
+        returns -- A pair '(status, output)'.  The 'status' is the
+        exit status from the command; the 'output' is the combined
+        results of the standard output and standard error streams."""
+
+        executable = self.BuildExecutable(self.executable_timeout)
+        command = [file] + args
+        index = self._RecordCommand(result, command)
+        status = executable.Run(command)
+        output = executable.stdout
+        self._RecordCommandOutput(result, index, status, output)
+
+        return status, output
+
+    
     def _RunTargetExecutable(self, context, result, file):
         """Run 'file' on the target.
 
@@ -122,7 +171,7 @@ class DejaGNUTest(Test):
         command = [file]
         index = self._RecordCommand(result, command)
         environment = self._GetTargetEnvironment(context)
-        status = executable.Run([file], environment)
+        status = executable.Run(command, environment)
         output = executable.stdout
         self._RecordCommandOutput(result, index, status, output)
         # Figure out whether the execution was successful.
@@ -231,6 +280,17 @@ class DejaGNUTest(Test):
         return self.source_file.GetDataFile()
 
 
+    def _GetBuild(self, context):
+        """Return the GNU triplet corresponding to the build machine.
+        
+        'context' -- The 'Context' in which the test is running.
+        
+        returns -- The GNU triplet corresponding to the target
+        machine, i.e,. the machine on which the compiler will run."""
+
+        return context.get("DejaGNUTest.build") or self._GetTarget(context)
+
+    
     def _GetTarget(self, context):
         """Return the GNU triplet corresponding to the target machine.
 
@@ -243,6 +303,17 @@ class DejaGNUTest(Test):
         return context["DejaGNUTest.target"]
     
 
+    def _IsNative(self, context):
+        """Returns true if the build and target machines are the same.
+
+        'context' -- The 'Context' in which this test is running.
+
+        returns -- True if this test is runing "natively", i.e., if
+        the build and target machines are the same."""
+
+        return self._GetTarget(context) == self._GetBuild(context)
+    
+        
     def _GetTmpdir(self):
         """Return the path to the temporary directory.
 
@@ -334,9 +405,9 @@ class DejaGNUTest(Test):
                 # string.
                 if in_brace_quoted_string:
                     if word is not None:
-                        word = word + "{"
+                        word = word + "}"
                     else:
-                        word = "{"
+                        word = "}"
             # A backslash-newline is translated into a space.
             elif c == '\\' and len(s) > 1 and s[1] == '\n':
                 # Skip the backslash and the newline.
