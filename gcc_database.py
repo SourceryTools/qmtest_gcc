@@ -54,10 +54,10 @@ class GCCDatabase(FileDatabase):
         ]
     
     __test_class_map = (
-        (os.path.join("gcc.dg", "cpp"),
-         "gcc_dg_test.GCCDGCPPTest"),
         (os.path.join("gcc.dg", "cpp", "trad"),
          "gcc_dg_test.GCCDGCPPTradTest"),
+        (os.path.join("gcc.dg", "cpp"),
+         "gcc_dg_test.GCCDGCPPTest"),
         (os.path.join("gcc.dg", "debug"),
          "debug_test.GCCDGDebugTest"),
         (os.path.join("gcc.dg", "format"),
@@ -66,12 +66,16 @@ class GCCDatabase(FileDatabase):
          "gcc_dg_test.GCCDGNoncompileTest"),
         (os.path.join("gcc.dg", "pch"),
          "dg_pch_test.GCCDGPCHTest"),
+        (os.path.join("gcc.dg", "tls"),
+         "dg_tls_test.GCCDGTLSTest"),
+        (os.path.join("gcc.dg", "torture"),
+         "gcc_dg_test.GCCDGTortureTest"),
         ("gcc.dg",
          "gcc_dg_test.GCCDGTest"),
         (os.path.join("g++.dg", "bprob"),
          "gpp_profile_test.GPPProfileTest"),
         (os.path.join("g++.dg", "tls"),
-         "gpp_dg_tls_test.GPPDGTLSTest"),
+         "dg_tls_test.GPPDGTLSTest"),
         (os.path.join("g++.dg", "compat"),
          "gpp_compat_test.GPPCompatTest"),
         (os.path.join("g++.dg", "debug"),
@@ -105,14 +109,24 @@ class GCCDatabase(FileDatabase):
             return ResourceDescriptor(self, resource_id,
                                       "compiler_table.CompilerTable",
                                       {})
+        elif resource_id == "gcc_init":
+            return ResourceDescriptor(self, resource_id,
+                                      "gcc_init.GCCInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["compiler_table"] })
         elif resource_id == "gpp_init":
             return ResourceDescriptor(self, resource_id,
                                       "gpp_init.GPPInit",
                                       { Runnable.RESOURCE_FIELD_ID :
                                         ["compiler_table"] })
+        elif resource_id == os.path.join("gcc.dg", "tls", "init"):
+            return ResourceDescriptor(self, resource_id,
+                                      "dg_tls_test.GCCTLSInit",
+                                      { Runnable.RESOURCE_FIELD_ID :
+                                        ["compiler_table"] })
         elif resource_id == os.path.join("g++.dg", "tls", "init"):
             return ResourceDescriptor(self, resource_id,
-                                      "gpp_tls_init.GPPTLSInit",
+                                      "dg_tls_test.GPPTLSInit",
                                       { Runnable.RESOURCE_FIELD_ID :
                                         ["gpp_init"] })
         elif resource_id == os.path.join("g++.dg", "debug", "init"):
@@ -127,7 +141,7 @@ class GCCDatabase(FileDatabase):
                                         ["compiler_table"] })
             
 
-        raise database.NoSuchResourceError, resource_id
+        raise self.NoSuchResourceError, resource_id
         
         
     def GetRoot(self):
@@ -170,9 +184,11 @@ class GCCDatabase(FileDatabase):
         if test_id.startswith("g++."):
             resources.append("gpp_init")
         elif test_id.startswith("gcc."):
-            resources.append("compiler_table")
+            resources.append("gcc_init")
         # The TLS tests depend on tls_init.
-        if test_id.startswith(os.path.join("g++.dg", "tls")):
+        if test_id.startswith(os.path.join("gcc.dg", "tls")):
+            resources.append(os.path.join("gcc.dg", "tls", "init"))
+        elif test_id.startswith(os.path.join("g++.dg", "tls")):
             resources.append(os.path.join("g++.dg", "tls", "init"))
         elif test_id.startswith(os.path.join("g++.dg", "debug")):
             resources.append(os.path.join("g++.dg", "debug", "init"))

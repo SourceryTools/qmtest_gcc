@@ -30,14 +30,13 @@ import sys
 class GPPInit(Resource, DejaGNUBase):
     """A 'GPPInit' resource stores information for G++ tests.
 
-    Every test in the database depends on a 'DejaGNUCompilerTable'
-    resource."""
+    Every C++ test depends on a 'GPPInit' resource."""
 
     def SetUp(self, context, result):
 
         super(GPPInit, self)._SetUp(context)
         
-        # Find the ordinary compiler table.
+        # Find the compiler table.
         compilers = context["CompilerTable.compiler_table"]
 
         # Get the C++ compiler.

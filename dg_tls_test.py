@@ -1,11 +1,11 @@
 ########################################################################
 #
-# File:   gpp_tls_init.py
+# File:   gpp_dg_tls_test.py
 # Author: Mark Mitchell
 # Date:   04/21/2003
 #
 # Contents:
-#   GPPTLSInit
+#   GPPDGTLSTest
 #
 # Copyright (c) 2003 by CodeSourcery, LLC.  All rights reserved. 
 #
@@ -17,7 +17,12 @@
 
 from   compiler import Compiler
 from   dejagnu_base import DejaGNUBase
+from   gcc_test_base import GCCTestBase
+from   gcc_dg_test import GCCDGTest
+from   gpp_dg_test import GPPDGTest
 from   gpp_test_base import GPPTestBase
+from   gpp_tls_init import GPPTLSInit
+from   qm.test.result import Result
 from   qm.test.resource import Resource
 import os
 
@@ -25,13 +30,13 @@ import os
 # Classes
 ########################################################################
 
-class GPPTLSInit(Resource, DejaGNUBase, GPPTestBase):
-    """A 'GPPTLSInit' stores information for thread-local-storage tests.
+class TLSInitBase(Resource, DejaGNUBase):
+    """A 'TLSInitBase' determines whether or not TLS is supported.
 
-    Every G++ thread-local-storage test depends on a 'GPPTLSInit'
+    Every thread-local-storage test depends on a 'GPPTLSInit'
     resource."""
 
-    SUPPORTED_TAG = "GPPTLSInit.supported"
+    SUPPORTED_TAG = "TLSInit.supported"
     """The context property that indicates compiler support for TLS.
 
     If this context property is true, the compiler supports TLS;
@@ -39,7 +44,7 @@ class GPPTLSInit(Resource, DejaGNUBase, GPPTestBase):
     
     def SetUp(self, context, result):
 
-        super(GPPTLSInit, self)._SetUp(context)
+        super(TLSInitBase, self)._SetUp(context)
         
         # This method emulates g++.dg/tls.exp.
         trivial_source_file = os.path.join(self.GetDatabase().GetRoot(),
@@ -52,3 +57,44 @@ class GPPTLSInit(Resource, DejaGNUBase, GPPTestBase):
             context[self.SUPPORTED_TAG] = 0
         else:
             context[self.SUPPORTED_TAG] = 1
+
+
+
+class GCCTLSInit(TLSInitBase, GCCTestBase):
+    """A 'GCCTLSInit' resource checks to see if TLS is available in GCC."""
+
+
+
+class GPPTLSInit(TLSInitBase, GPPTestBase):
+    """A 'GPPTLSInit' resource checks to see if TLS is available in G++."""
+
+
+    
+class GCCDGTLSTest(GCCDGTest):
+    """A 'GPPDGTLSTest' is a G++ test using the 'tls.exp' driver."""
+
+    def Run(self, context, result):
+
+        if not context[GCCTLSInit.SUPPORTED_TAG]:
+            result.SetOutcome(Result.UNTESTED,
+                              "Thread-local storage is not supported.")
+            return
+
+        super(GCCDGTLSTest, self).Run(context, result)
+
+
+
+class GPPDGTLSTest(GPPDGTest):
+    """A 'GPPDGTLSTest' is a G++ test using the 'tls.exp' driver."""
+
+    def Run(self, context, result):
+
+        if not context[GPPTLSInit.SUPPORTED_TAG]:
+            result.SetOutcome(Result.UNTESTED,
+                              "Thread-local storage is not supported.")
+            return
+        
+        super(GPPDGTLSTest, self).Run(context, result)
+
+
+

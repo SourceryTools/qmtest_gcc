@@ -16,7 +16,7 @@
 ########################################################################
 
 import filecmp
-from   gcc_dg_test import GCCDGTest
+from   gcc_dg_test import GCCDGTortureTest
 from   gpp_dg_test import GPPDGTest
 import os
 import shutil
@@ -99,12 +99,12 @@ class DGPCHTest:
 
 
 
-class GCCDGPCHTest(DGPCHTest, GCCDGTest):
+class GCCDGPCHTest(DGPCHTest, GCCDGTortureTest):
     """A 'GCCDGPCHTest' is a GCC test using the 'pch.exp' driver."""
 
     _suffix = ".h"
 
-    _pch_options = ["-O0 -g"] + GCCDGTest._torture_without_loops
+    _pch_options = ["-O0 -g"] + GCCDGTortureTest._torture_without_loops
 
 
 

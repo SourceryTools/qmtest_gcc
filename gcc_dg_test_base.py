@@ -89,8 +89,8 @@ class GCCDGTestBase(DGTest):
                                                context, result)
 
 
-    def _DGgpp_additional_files(self, line_num, args, context):
-        """Emulate the 'dg-gpp-additional-file' command.
+    def _DGadditional_files(self, line_num, args, context):
+        """Emulate the 'dg-additional-file' command.
 
         'line_num' -- The number at which the command was found.
 
@@ -106,8 +106,8 @@ class GCCDGTestBase(DGTest):
         return
 
 
-    def _DGgpp_additional_sources(self, line_num, args, context):
-        """Emulate the 'dg-gpp-additional-sources' command.
+    def _DGadditional_sources(self, line_num, args, context):
+        """Emulate the 'dg-additional-sources' command.
 
         'line_num' -- The number at which the command was found.
 
@@ -118,7 +118,7 @@ class GCCDGTestBase(DGTest):
 
         self.__additional_source_files = args[0].split()
 
-        
+
     def _PruneOutput(self, output):
 
         # This function emulates prune_gcc_output.
