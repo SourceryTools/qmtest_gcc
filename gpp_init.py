@@ -88,8 +88,8 @@ class GPPInit(Resource, DejaGNUBase):
             executable.Run(command)
             options += executable.stdout.split()
         except:
-            result.NoteException("Could not run testsuite_flags",
-                                 Result.FAIL)
+            result.NoteException(cause="Could not run testsuite_flags",
+                                 outcome=Result.FAIL)
             return
 
         # Avoid splitting diagnostic message lines.
