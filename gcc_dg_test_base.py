@@ -70,38 +70,20 @@ class GCCDGTestBase(DGTest):
 
         if command in ("scan-assembler", "scan-assembler-not",
                        "scan-assembler-dem", "scan-assembler-dem-not"):
-            # See if there is a target selector applied to this test.
-            expectation = self.PASS
-            if len(args) > 1:
-                code = self._ParseTargetSelector(args[1], context)
-                if code == "N":
-                    return
-                if code == "F":
-                    expectation = self.FAIL
-
-            # See if the pattern appears in the output.
-            pattern = args[0]
-            output = self.__GetOutputFile(context,
-                                          self.KIND_COMPILE,
-                                          self.GetId())
-            output = open(output).read()
-            # Run the output through the demangler, if necessary.
-            if command in ("scan-assembler-dem", "scan-assembler-dem-not"):
-                executable = Filter(output)
-                executable.Run(["c++filt"])
-                output = executable.stdout
-            m = re.search(pattern, output)
-
-            # Record the result of the test.
-            if ((command in ("scan-assembler",
-                             "scan-assembler-dem") and not m)
-                or (command in ("scan-assembler-not",
-                                "scan-assembler-dem-not") and m)):
-                outcome = self.FAIL
-            else:
-                outcome = self.PASS
-            message = self._name + " " + command + " " + pattern
-            self._RecordDejaGNUOutcome(result, outcome, message, expectation)
+            self.__ScanFile(result,
+                            context,
+                            command,
+                            self.__GetOutputFile(context,
+                                                 self.KIND_COMPILE,
+                                                 self.GetId()),
+                            args)
+        elif command in ("scan-file", "scan-file-not"):
+            self.__ScanFile(result,
+                            context,
+                            command,
+                            os.path.join(context.GetTemporaryDirectory(),
+                                         args[0]),
+                            args[1:])
         else:
             return DGTest._ExecuteFinalCommand(self, command, args,
                                                context, result)
@@ -152,7 +134,7 @@ class GCCDGTestBase(DGTest):
             dirname = os.path.dirname(path)
             source_files += map(lambda f: os.path.join(dirname, f),
                                 self.__additional_source_files)
-        options = options.split()
+        options = self._ParseTclWords(options)
         if "-frepo" in options:
             is_repo_test = 1
             kind = DGTest.KIND_ASSEMBLE
@@ -193,6 +175,54 @@ class GCCDGTestBase(DGTest):
         file += ext
 
         return os.path.join(context.GetTemporaryDirectory(), file)
+
+
+    def __ScanFile(self, result, context, command, output_file, args):
+        """Look for a pattern in the 'output_file'.
+
+        'result' -- The QMTest 'Result' for this test.
+
+        'context' -- The QMTest 'Context' in which this test is
+        executing.
+        
+        'command' -- The name of the 'dg-final' command being run.
+
+        'output_file' -- The name of the file in which to look for the
+        pattern.
+
+        'args' -- The arguments to the 'command'.
+
+        This method emulates 'dg-scan' in the GCC testsuite."""
+
+        # See if there is a target selector applied to this test.
+        expectation = self.PASS
+        if len(args) > 1:
+            code = self._ParseTargetSelector(args[1], context)
+            if code == "N":
+                return
+            if code == "F":
+                expectation = self.FAIL
+
+        # See if the pattern appears in the output.
+        pattern = args[0]
+        output = open(output_file).read()
+        # Run the output through the demangler, if necessary.
+        if command in ("scan-assembler-dem", "scan-assembler-dem-not"):
+            executable = Filter(output)
+            executable.Run(["c++filt"])
+            output = executable.stdout
+        m = re.search(pattern, output)
+
+        # Command names that end with "not" indicate negative tests.
+        positive = not command.endswith("not")
+        # Record the result of the test.
+        if ((positive and m)
+            or (not positive and not m)):
+            outcome = self.PASS
+        else:
+            outcome = self.FAIL
+        message = self._name + " " + command + " " + pattern
+        self._RecordDejaGNUOutcome(result, outcome, message, expectation)
         
 
     def _SetUp(self, context):
