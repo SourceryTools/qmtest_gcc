@@ -29,9 +29,7 @@ import os
 ########################################################################
 
 class DebugInit(Resource, DejaGNUBase, GCCTestBase):
-    """A 'DebugInit' stores information for debugging tests.
-
-    Every G++ debugging test depends on a 'GPPDebugInit' resource."""
+    """A 'DebugInit' stores information for debugging tests."""
 
     OPTIONS_TAG = None
     """This context property indicates what debugging options are available.

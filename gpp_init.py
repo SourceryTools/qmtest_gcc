@@ -76,7 +76,9 @@ class GPPInit(Resource, DejaGNUBase):
 
         # Run "testsuite_flags" to figure out which -I options to use
         # when running tests.
-        command = [os.path.join(v3_directory, "testsuite_flags"),
+        command = [os.path.join(v3_directory,
+                                "scripts",
+                                "testsuite_flags"),
                    "--build-includes"]
         result["GPPInit.testsuite_flags_command"] \
             = "<pre>" + " ".join(command) + "</pre>"

@@ -18,12 +18,12 @@
 import fnmatch
 import os
 import qm
+import qm.test.base
 from   qm.attachment import Attachment, FileAttachmentStore
 from   qm.test.database import ResourceDescriptor, TestDescriptor
 from   qm.test.file_database import FileDatabase
 from   qm.test.directory_suite import DirectorySuite
 from   qm.test.runnable import Runnable
-from   qm.test.suite import Suite
 
 ########################################################################
 # Classes
@@ -163,12 +163,19 @@ class GCCDatabase(FileDatabase):
 
     def GetSuite(self, suite_id):
 
+        suite_class = qm.test.base.get_extension_class(
+            "explicit_suite.ExplicitSuite", "suite", self)
+        extras = { suite_class.EXTRA_DATABASE: self,
+                   suite_class.EXTRA_ID: suite_id }
+        arguments = { "is_implicit": 1,
+                      "test_ids": [] }
+                   
         if suite_id == "g++":
-            return Suite(self, suite_id, implicit = 1,
-                         suite_ids = ["g++.dg", "g++.old-deja"])
+            arguments["suite_ids"] = ["g++.dg", "g++.old-deja"]
+            return suite_class(arguments, **extras)
         elif suite_id == "gcc":
-            return Suite(self, suite_id, implicit = 1,
-                         suite_ids = ["gcc.dg"])
+            arguments["suite_ids"] = ["gcc.dg"]
+            return suite_class(arguments, **extras)
 
         return super(GCCDatabase, self).GetSuite(suite_id)
                      

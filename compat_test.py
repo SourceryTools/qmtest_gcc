@@ -36,6 +36,9 @@ class CompatTest(DejaGNUTest):
     the first match group gives special options that should be used to
     run the test-case."""
     
+    dejagnu_file_prefix = None
+    """The prefix a real DejaGNU test uses for its filenames."""
+
     def Run(self, context, result):
 
         self._SetUp(context)
@@ -59,6 +62,8 @@ class CompatTest(DejaGNUTest):
         src3 = src1.replace("_main", "_y")
 
         temp_dir = context.GetTemporaryDirectory()
+        result["compat_test_dejagnu_prefix"] = self.dejagnu_file_prefix
+        result["compat_test_qmtest_prefix"] = temp_dir + os.path.sep
         obj1 = os.path.join(temp_dir, "main_tst.o")
         obj2_tst = os.path.join(temp_dir, "x_tst.o")
         obj2_alt = os.path.join(temp_dir, "x_alt.o")
@@ -211,12 +216,14 @@ class CompatTest(DejaGNUTest):
 class GCCCompatTest(CompatTest, GCCTestBase):
     """A 'GPPCompatTest' emulates a GCC 'compat.exp' test."""
 
-    pass
+    dejagnu_file_prefix = "c_compat_"
 
 
 
 class GPPCompatTest(CompatTest, GPPTestBase):
     """A 'GPPCompatTest' emulates a G++ 'compat.exp' test."""
+
+    dejagnu_file_prefix = "cp_compat_"
 
     def _GetTargetEnvironment(self, context):
 

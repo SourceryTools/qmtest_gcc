@@ -25,7 +25,7 @@ import os
 class GPPTestBase(GCCTestBase):
     """A 'GPPTestBase' is a base for all G++ tests.
 
-    This class emulates functional in 'g++.exp' in the GCC
+    This class emulates functionality in 'g++.exp' in the GCC
     testsuite."""
 
     _language = "cplusplus"

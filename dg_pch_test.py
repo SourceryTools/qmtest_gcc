@@ -94,7 +94,7 @@ class DGPCHTest:
                 self._RecordDejaGNUOutcome(result,
                                            self.UNTESTED,
                                            self._name + " " + o)
-            message = self._name + " " + o + " assembly comparision"
+            message = self._name + " " + o + " assembly comparison"
             self._RecordDejaGNUOutcome(result, assembly_outcome, message)
 
 

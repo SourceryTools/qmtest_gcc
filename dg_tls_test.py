@@ -21,7 +21,6 @@ from   gcc_test_base import GCCTestBase
 from   gcc_dg_test import GCCDGTest
 from   gpp_dg_test import GPPDGTest
 from   gpp_test_base import GPPTestBase
-from   gpp_tls_init import GPPTLSInit
 from   qm.test.result import Result
 from   qm.test.resource import Resource
 import os
