@@ -111,14 +111,6 @@ class V3Init(Resource):
             
         context["V3Init.outdir"] = outdir
 
-#         print "options = %s" % repr(options)
-#         print "directory = '%s'" % directory
-#         print "objdir = '%s'" % objdir
-#         print "target = '%s'" % target
-#         print "blddir = '%s'" % blddir
-#         print "outdir = '%s'" % outdir
-#         print "srcdir = '%s'" % srcdir
-
         # Ensure that the message format files are available.
         # This requires different commands depending on whether we're
         # using the gcc build system or not.
@@ -582,8 +574,6 @@ class V3ABITest(Test):
                               "Could not find path to libstdc++ in "
                               "ldd output")
             return
-#         libstdcpp = os.path.join(outdir, "..", "src", ".libs",
-#                                  "libstdc++.so")
         result["libstdcpp_path"] = libstdcpp
 
         curr_symbols = os.path.join(tmpdir, "current_symbols.txt")
