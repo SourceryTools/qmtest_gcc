@@ -1,0 +1,21 @@
+QMTEST_GCC
+==========
+
+QMTEST_GCC contains emulation of the GCC DejaGNU testsuite using
+QMTest (http://www.qmtest.com).
+
+The emulation is not yet complete.  At present, the G++ testsuite, and
+someof the GCC testsuite, work correctly when using a native compiler.
+
+License
+-------
+
+QMTC is licensed under the GNU General Public License.  See the file
+COPYING for the exact text of the license.
+
+Additional Information
+----------------------
+
+For more information about this software, please contact:
+
+  info@codesourcery.com
