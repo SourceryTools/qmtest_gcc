@@ -80,10 +80,10 @@ class InstallRecorder(object):
         self._file.write("%s\n" % path)
 
 
-def main(fullname, args):
+def main(fullname, fullargs):
 
     name = os.path.basename(fullname)
-    options, args = optparser.parse_args(args)
+    options, args = optparser.parse_args(fullargs)
     if len(args) != 4:
         optparser.error("Wrong number of arguments")
 
@@ -169,7 +169,7 @@ def main(fullname, args):
                      "prog_fullname": fullname,
                      "gcc_version": gcc_version,
                      "pkg_version": pkg_version,
-                     "prog_args": " ".join(args),
+                     "prog_args": " ".join(fullargs),
                      "user": getpass.getuser(),
                      "time": time.strftime("%Y-%m-%d %H:%M:%S"),
                      }
@@ -292,7 +292,7 @@ PREREQUISITES
   A Red Hat Package Manager (RPM) distribution of a QMTest snapshot
   that works with this testsuite is available at:
 
-    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040331/qm-20040331.noarch.rpm
+    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040331/qm-20040331-1.noarch.rpm
 
   The RPM is architecture-independent; it can be installed on any
   GNU/Linux system that supports the RPM format.
