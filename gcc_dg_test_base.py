@@ -68,8 +68,34 @@ class GCCDGTestBase(DGTest):
 
     def _ExecuteFinalCommand(self, command, args, context, result):
 
-        if command in ("scan-assembler", "scan-assembler-not",
-                       "scan-assembler-dem", "scan-assembler-dem-not"):
+        if command == "scan-assembler-times":
+            count = int(args[1])
+            expectation = self.PASS
+            if len(args) > 2:
+                code = self._ParseTargetSelector(args[2], context)
+                if code == "N":
+                    return
+                if code == "F":
+                    expectation = self.FAIL
+            # See if the pattern appears in the output.
+            pattern = args[0]
+            output_file = self.__GetOutputFile(context,
+                                               self.KIND_COMPILE,
+                                               self.GetId())
+            output = open(output_file).read()
+            c = len(re.findall(pattern, output))
+
+            message = (self.GetId() + " scan-assembler-times %s %d"
+                       % (pattern, count))
+            if c == count:
+                outcome = self.PASS
+            else:
+                outcome = self.FAIL
+            self._RecordDejaGNUOutcome(result, outcome, message, expectation)
+        elif command in ("scan-assembler",
+                         "scan-assembler-not",
+                         "scan-assembler-dem",
+                         "scan-assembler-dem-not"):
             self.__ScanFile(result,
                             context,
                             command,

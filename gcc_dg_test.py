@@ -45,7 +45,37 @@ class GCCDGTest(GCCDGTestBase, GCCTestBase):
         if not context[GCCInit.SUPPORTS_WEAK_CONTEXT_PROPERTY]:
             self._DGdo(line_num, ["run", "target none-none-none"],
                        context)
+
+
+    def _DGrequire_alias(self, line_num, args, context):
+        """Emulate the 'dg-require-alias' command.
+
+        'line_num' -- The number at which the command was found.
+
+        'args' -- The arguments to the command, as a list of
+        strings.
+
+        'context' -- The 'Context' in which the test is running."""
+
+        if not context[GCCInit.SUPPORTS_ALIAS_CONTEXT_PROPERTY]:
+            self._DGdo(line_num, ["run", "target none-none-none"],
+                       context)
         
+
+    def _DGrequire_gc_sections(self, line_num, args, context):
+        """Emulate the 'dg-require-gc-sections' command.
+
+        'line_num' -- The number at which the command was found.
+
+        'args' -- The arguments to the command, as a list of
+        strings.
+
+        'context' -- The 'Context' in which the test is running."""
+
+        if not context[GCCInit.SUPPORTS_GCSEC_CONTEXT_PROPERTY]:
+            self._DGdo(line_num, ["run", "target none-none-none"],
+                       context)
+
 
 
 class GCCDGNoncompileTest(GCCDGTest):

@@ -15,6 +15,7 @@
 # Imports
 ########################################################################
 
+import fnmatch
 import os
 import qm
 from   qm.attachment import Attachment, FileAttachmentStore
@@ -54,6 +55,8 @@ class GCCDatabase(FileDatabase):
         ]
     
     __test_class_map = (
+        (os.path.join("gcc.dg", "compat"),
+         "compat_test.GCCCompatTest"),
         (os.path.join("gcc.dg", "cpp", "trad"),
          "gcc_dg_test.GCCDGCPPTradTest"),
         (os.path.join("gcc.dg", "cpp"),
@@ -77,7 +80,7 @@ class GCCDatabase(FileDatabase):
         (os.path.join("g++.dg", "tls"),
          "dg_tls_test.GPPDGTLSTest"),
         (os.path.join("g++.dg", "compat"),
-         "gpp_compat_test.GPPCompatTest"),
+         "compat_test.GPPCompatTest"),
         (os.path.join("g++.dg", "debug"),
          "debug_test.GPPDGDebugTest"),
         (os.path.join("g++.dg", "gcov"),
@@ -159,6 +162,9 @@ class GCCDatabase(FileDatabase):
         if suite_id == "g++":
             return Suite(self, suite_id, implicit = 1,
                          suite_ids = ["g++.dg", "g++.old-deja"])
+        elif suite_id == "gcc":
+            return Suite(self, suite_id, implicit = 1,
+                         suite_ids = ["gcc.dg"])
 
         return super(GCCDatabase, self).GetSuite(suite_id)
                      
@@ -215,6 +221,17 @@ class GCCDatabase(FileDatabase):
             return 0
 
         rel_path = path[len(self.GetRoot()):]
+
+        # In the gcc.dg/compat subdirectory, only tests that end with
+        # _main.c are tests.
+        if rel_path.startswith(os.sep + os.path.join("gcc.dg", "compat")):
+            return rel_path.endswith("_main.c")
+
+        # If the gcc.dg/special subdirectory, only some source files
+        # are tests.
+        if rel_path.startswith(os.sep + os.path.join("gcc.dg", "special")):
+            return fnmatch.fnmatch(rel_path, "*[1-9].c")
+                
         if rel_path.startswith(os.path.join(os.sep, "gcc")):
             return os.path.splitext(path)[1] == ".c"
 

@@ -16,6 +16,8 @@
 ########################################################################
 
 from   dejagnu_test import DejaGNUTest
+from   gcc_test_base import GCCTestBase
+from   gpp_test_base import GPPTestBase
 import os
 import re
 
@@ -204,4 +206,18 @@ class CompatTest(DejaGNUTest):
             os.remove(dest)
         self._RecordDejaGNUOutcome(result, outcome, exec_message)
     
-                 
+
+
+class GCCCompatTest(CompatTest, GCCTestBase):
+    """A 'GPPCompatTest' emulates a GCC 'compat.exp' test."""
+
+    pass
+
+
+
+class GPPCompatTest(CompatTest, GPPTestBase):
+    """A 'GPPCompatTest' emulates a G++ 'compat.exp' test."""
+
+    def _GetTargetEnvironment(self, context):
+
+        return GPPTestBase._GetTargetEnvironment(self, context)
