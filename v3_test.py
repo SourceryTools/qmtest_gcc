@@ -41,7 +41,22 @@ _ld_library_path_names = ["LD_LIBRARY_PATH", "SHLIB_PATH",
                           "LD_LIBRARY_PATH_64", "DYLD_LIBRARY_PATH"]
 """All the different envvars that might mean LD_LIBRARY_PATH."""
 
-class V3Init(Resource):
+class V3Base(object):
+    """Methods required by all V3 classes."""
+
+    def _HaveCompiler(self, context):
+        """Returns true if we have a compiler."""
+
+        if not context.has_key("V3Test.have_compiler"):
+            # By default we assume there is a compiler.
+            return True
+        
+        # But if there is a context key, we trust it.
+        return qm.parse_boolean(context["V3Test.have_compiler"])
+
+
+
+class V3Init(Resource, V3Base):
     """All V3 tests depend on one of these for setup."""
 
     def SetUp(self, context, result):
@@ -50,6 +65,24 @@ class V3Init(Resource):
         # the setup.
         srcdir = self.GetDatabase().GetRoot()
         target = context["DejaGNUTest.target"]
+
+        # If there is a compiler output directory given, ensure the path
+        # is absolute, and ensure it exists.
+        if context.has_key("V3Test.compiler_output_dir"):
+            compiler_outdir = context["V3Test.compiler_output_dir"]
+            compiler_outdir = os.path.abspath(compiler_outdir)
+            context["V3Test.compiler_output_dir"] = compiler_outdir
+            if not os.path.exists(compiler_outdir):
+                os.mkdir(compiler_outdir)
+        else:
+            compiler_outdir = None
+                
+        if not self._HaveCompiler(context) and compiler_outdir is None:
+            result.SetOutcome(result.ERROR,
+                              "If have_compiler is false, then "
+                              "V3Test.compiler_output_dir must be "
+                              "provided")
+            return
 
         # Are we using the standalone testsuite to test an installed
         # libstdc++/g++, or the integrated testsuite to test a
@@ -60,11 +93,12 @@ class V3Init(Resource):
         standalone = os.path.exists(standalone_marker)
         if standalone:
             standalone_root = os.path.join(srcdir, "..")
-        context["V3Init.is_standalone"] = standalone
+        context["V3Test.is_standalone"] = standalone
 
         # Find the compiler.
-        compilers = context["CompilerTable.compiler_table"]
-        compiler = compilers["cplusplus"]
+        if self._HaveCompiler(context):
+            compilers = context["CompilerTable.compiler_table"]
+            compiler = compilers["cplusplus"]
 
 
         if not standalone:
@@ -100,16 +134,16 @@ class V3Init(Resource):
             # Our code always refers to this directory as 'outdir' for
             # parallelism with the DejaGNU code we emulate, but we call
             # it "scratch_dir" for UI purposes.
-            if context.has_key("V3Init.outdir"):
+            if context.has_key("V3Test.outdir"):
                 result.SetOutcome(result.ERROR,
-                                  "Set V3Init.scratch_dir, not outdir")
+                                  "Set V3Test.scratch_dir, not outdir")
                 return
-            outdir = context["V3Init.scratch_dir"]
+            outdir = context["V3Test.scratch_dir"]
             outdir = os.path.abspath(outdir)
             if not os.path.exists(outdir):
                 os.mkdir(outdir)
             
-        context["V3Init.outdir"] = outdir
+        context["V3Test.outdir"] = outdir
 
         # Ensure that the message format files are available.
         # This requires different commands depending on whether we're
@@ -118,40 +152,55 @@ class V3Init(Resource):
             locale_dir = os.path.join(blddir, "po")
             make_command = ["make", "-j1", "check"]
         else:
-            # Standalone build needs to set up the locale stuff in its
-            # own directory.
-            locale_dir = os.path.join(outdir, "qm_locale")
-            try:
-                os.mkdir(locale_dir)
-            except OSError:
-                pass
-            makefile_in = open(os.path.join(standalone_root,
-                                                  "qm-misc",
-                                                  "locale-Makefile"))
-            makefile_str = makefile_in.read()
-            makefile_str = makefile_str.replace("@ROOT@",
-                                                standalone_root)
-            makefile_out = open(os.path.join(locale_dir, "Makefile"),
-                                "w")
-            makefile_out.write(makefile_str)
-            makefile_out.close()
-            make_command = ["make", "-j1", "locales"]
+            if self._HaveCompiler(context):
+                # Standalone build needs to set up the locale stuff in its
+                # own directory.
+                locale_dir = os.path.join(outdir, "qm_locale")
+                try:
+                    os.mkdir(locale_dir)
+                except OSError:
+                    pass
+                makefile_in = open(os.path.join(standalone_root,
+                                                "qm-misc",
+                                                "locale-Makefile"))
+                makefile_str = makefile_in.read()
+                makefile_str = makefile_str.replace("@ROOT@",
+                                                    standalone_root)
+                makefile_out = open(os.path.join(locale_dir,
+                                                 "Makefile"),
+                                    "w")
+                makefile_out.write(makefile_str)
+                makefile_out.close()
+                make_command = ["make", "-j1", "locales"]
+            else:
+                # We're standalone without a compiler; we'll use the
+                # locale dir in the compiler output directory directly.
+                locale_dir = os.path.join(compiler_outdir, "qm_locale")
+            # Either way, we need to provide the locale directory as an
+            # environment variable, _not_ as a #define.
+            context["V3Init.env_V3_LOCALEDIR"] = locale_dir
 
-        make_executable = RedirectedExecutable()
-        status = make_executable.Run(make_command, dir=locale_dir)
-        if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
-            result.SetOutcome(result.ERROR,
-                              "Error building locale information",
-                              {"status": str(status),
-                               "stdout": "<pre>"
-                                         + make_executable.stdout
-                                         + "</pre>",
-                               "stderr": "<pre>"
-                                         + make_executable.stderr
-                                         + "</pre>",
-                               "command": " ".join(make_command),
-                               })
-            return
+        # Now do the actual compiling, if possible.
+        if self._HaveCompiler(context):
+            make_executable = RedirectedExecutable()
+            status = make_executable.Run(make_command, dir=locale_dir)
+            if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+                q_stdout = result.Quote(make_executable.stdout)
+                q_stderr = result.Quote(make_executable.stderr)
+                result.SetOutcome(result.ERROR,
+                                  "Error building locale information",
+                                  {"status": str(status),
+                                   "stdout": q_stdout,
+                                   "stderr": q_stderr,
+                                   "command": " ".join(make_command),
+                                   })
+                return
+
+            if compiler_outdir is not None:
+                co_ld = os.path.join(compiler_outdir, "qm_locale")
+                if os.path.exists(co_ld):
+                    shutil.rmtree(co_ld, ignore_errors=True)
+                shutil.copytree(locale_dir, co_ld)
             
 
         # Copy data files.
@@ -197,9 +246,9 @@ class V3Init(Resource):
             ld_library_path = ":".join(original_ld_library_path)
 
         libpaths.append(outdir)
-        context["V3Init.libpaths"] = libpaths
-        context["V3Init.ld_library_path"] = ld_library_path
-        result["V3Init.ld_library_path"] = ld_library_path
+        context["V3Test.libpaths"] = libpaths
+        context["V3Test.ld_library_path"] = ld_library_path
+        result["V3Test.ld_library_path"] = ld_library_path
 
         # Calculate default g++ flags.  Both branches create basic_flags
         # and default_flags.
@@ -215,7 +264,11 @@ class V3Init(Resource):
             basic_flags, default_flags = all_flags
         else:
             # We take the union of the 3.3 and the 3.4 defines; it
-            # doesn't seem to hurt.
+            # doesn't seem to hurt.  Only exception is that we
+            # purposefully leave out -DLOCALEDIR when doing standalone
+            # testing, so that it will be picked up from the environment
+            # instead.  This ensures that binary-only tests can be moved
+            # after being compiled.
             basic_flags = [# v3.4 only:
                            "-D_GLIBCXX_ASSERT",
                            # v3.3 only:
@@ -224,50 +277,65 @@ class V3Init(Resource):
                            "-g", "-O2",
                            "-ffunction-sections", "-fdata-sections",
                            "-fmessage-length=0",
-                           "-DLOCALEDIR=\"%s\"" % locale_dir,
                            "-I%s" % srcdir]
             default_flags = []
+            
 
         default_flags.append("-D_GLIBCXX_ASSERT")
         if fnmatch.fnmatch(context["DejaGNUTest.target"],
                            "powerpc-*-darwin*"):
             default_flags += ["-multiply_defined", "suppress"]
-        context["V3Init.basic_cxx_flags"] = basic_flags
-        context["V3Init.default_cxx_flags"] = default_flags
+        context["V3Test.basic_cxx_flags"] = basic_flags
+        context["V3Test.default_cxx_flags"] = default_flags
         
         if standalone:
-            # Build libv3test.a.
-            makefile_in = open(os.path.join(standalone_root,
-                                            "qm-misc",
-                                            "util-Makefile"))
-            makefile_str = makefile_in.read()
-            makefile_str = makefile_str.replace("@ROOT@",
-                                                standalone_root)
-            makefile_str = makefile_str.replace("@CXX@",
-                                                compiler.GetPath())
-            flags = compiler.GetOptions() + basic_flags
-            makefile_str = makefile_str.replace("@CXXFLAGS@",
-                                                " ".join(flags))
-            makefile_out = open(os.path.join(outdir, "Makefile"), "w")
-            makefile_out.write(makefile_str)
-            makefile_out.close()
-            
-            make_executable = RedirectedExecutable()
-            make_command = ["make", "libv3test.a"]
-            status = make_executable.Run(make_command, dir=outdir)
-            if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
-                result.SetOutcome(result.ERROR,
-                                  "Error building libv3test.a",
-                                  {"status": str(status),
-                                   "stdout": "<pre>"
-                                             + make_executable.stdout
-                                             + "</pre>",
-                                   "stderr": "<pre>"
-                                             + make_executable.stderr
-                                             + "</pre>",
-                                   "command": " ".join(make_command),
-                                   })
-                return
+            # Ensure libv3test.a exists in 'outdir'.
+            if self._HaveCompiler(context):
+                # Build libv3test.a.
+                makefile_in = open(os.path.join(standalone_root,
+                                                "qm-misc",
+                                                "util-Makefile"))
+                makefile_str = makefile_in.read()
+                makefile_str = makefile_str.replace("@ROOT@",
+                                                    standalone_root)
+                makefile_str = makefile_str.replace("@CXX@",
+                                                    compiler.GetPath())
+                flags = compiler.GetOptions() + basic_flags
+                makefile_str = makefile_str.replace("@CXXFLAGS@",
+                                                    " ".join(flags))
+                makefile_out = open(os.path.join(outdir, "Makefile"),
+                                    "w")
+                makefile_out.write(makefile_str)
+                makefile_out.close()
+
+                make_executable = RedirectedExecutable()
+                make_command = ["make", "libv3test.a"]
+                status = make_executable.Run(make_command, dir=outdir)
+                if (not os.WIFEXITED(status)
+                    or os.WEXITSTATUS(status) != 0):
+                    q_stdout = result.Quote(make_executable.stdout)
+                    q_stderr = result.Quote(make_executable.stderr)
+                    command_str = " ".join(make_command),
+                    result.SetOutcome(result.ERROR,
+                                      "Error building libv3test.a",
+                                      {"status": str(status),
+                                       "stdout": q_stdout,
+                                       "stderr": q_stderr,
+                                       "command": command_str,
+                                       })
+                    return
+
+                # If we have an compiler output dir, use it.
+                if compiler_outdir is not None:
+                    shutil.copy(os.path.join(outdir, "libv3test.a"),
+                                os.path.join(compiler_outdir,
+                                             "libv3test.a"))
+            else:
+                # No compiler, so we just copy it out of the compiler
+                # output dir.
+                shutil.copy(os.path.join(compiler_outdir,
+                                         "libv3test.a"),
+                            os.path.join(outdir, "libv3test.a"))
 
         
     def _CalcBuildTreeFlags(self, result, context, blddir, compiler):
@@ -283,8 +351,7 @@ class V3Init(Resource):
             if os.path.isfile(command):
                 break
 
-        result["V3Init.testsuite_flags_command"] = \
-            "<pre>" + command + "</pre>"
+        result["V3Test.testsuite_flags_command"] = result.Quote(command)
 
         executable = RedirectedExecutable()
         executable.Run([command, "--cxxflags"])
@@ -304,6 +371,8 @@ class V3Init(Resource):
 
         return (basic_flags, default_flags)
 
+# How DejaGNU does this, for reference:
+#
 # dg-runtest calls dg-test calls "libstdc++-dg-test prog do_what
 # DEFAULT_CXXFLAGS" (DEFAULT_CXXFLAGS as in normal.exp)
 # Which calls
@@ -313,7 +382,7 @@ class V3Init(Resource):
 #   target_compile $prog $output_file $compile_type additional_flags=$DEFAULT_CXXFLAGS,compiler=$cxx_final,ldflags=-L$blddir/testsuite,libs=-lv3test
 # for us, libgloss doesn't exist, which simplifies things.
 
-class V3DGTest(DGTest, GCCTestBase):
+class V3DGTest(DGTest, GCCTestBase, V3Base):
     """A 'V3DGTest' is a libstdc++-v3 test using the 'dg' driver.
 
     This test class emulates the 'lib/libstdc++.exp' and 'lib/prune.exp
@@ -324,15 +393,23 @@ class V3DGTest(DGTest, GCCTestBase):
 
     _language = "cplusplus"
 
-    _libdir_context_property = "V3Init.libpaths"
+    _libdir_context_property = "V3Test.libpaths"
 
     def Run(self, context, result):
 
         self._SetUp(context)
-        self._RunDGTest(context["V3Init.basic_cxx_flags"],
-                        context["V3Init.default_cxx_flags"],
+
+        if context.has_key("V3Test.compiler_output_dir"):
+            # When using a special output directory, we always save the
+            # executables.
+            keep_output = 1
+        else:
+            keep_output = 0
+        self._RunDGTest(context["V3Test.basic_cxx_flags"],
+                        context["V3Test.default_cxx_flags"],
                         context,
-                        result)
+                        result,
+                        keep_output=keep_output)
         
 
     def _PruneOutput(self, output):
@@ -351,14 +428,16 @@ class V3DGTest(DGTest, GCCTestBase):
 
         env = {}
         for name in _ld_library_path_names:
-            env[name] = context["V3Init.ld_library_path"]
+            env[name] = context["V3Test.ld_library_path"]
+        if context.has_key("V3Init.env_V3_LOCALEDIR"):
+            env["V3_LOCALEDIR"] = context["V3Init.env_V3_LOCALEDIR"]
         return env
 
 
     def _RunTargetExecutable(self, context, result, file, dir = None):
 
         if dir is None:
-            dir = context["V3Init.outdir"]
+            dir = context["V3Test.outdir"]
 
         sup = super(V3DGTest, self)
         return sup._RunTargetExecutable(context, result, file, dir)
@@ -380,9 +459,52 @@ class V3DGTest(DGTest, GCCTestBase):
         return (output, file)
 
 
+    def _RunDGToolPortion(self, path, tool_flags, context, result):
+        """Don't run the compiler if in pre-compiled mode."""
+
+        if not self._HaveCompiler(context):
+            # Don't run the compiler, just pretend we did.
+            return self._GetOutputFile(context, self._kind, path)
+            
+        return super(V3DGTest, self)._RunDGToolPortion(path, tool_flags,
+                                                       context, result)
+            
+
+    def _RunDGExecutePortion(self, file, context, result):
+        """Emit an UNTESTED result if not compiling and not running."""
+
+        if (not self._HaveCompiler(context)
+            and self._kind != DGTest.KIND_RUN):
+            # We didn't run the compiler, and we're not going to run the
+            # executable; we'd better emit something here because we're
+            # not doing it anywhere else.
+            result["V3DGTest.explanation_1"] = (
+                "This is a compiler test, and we are running in no "
+                "compiler mode.  Skipped.")
+            # Magic marker for the TET output stream to pick up on:
+            result["test_not_relevant_to_testing_mode"] = "true"
+            self._RecordDejaGNUOutcome(result,
+                                       self.UNTESTED, self._name)
+            return
+                
+        super(V3DGTest, self)._RunDGExecutePortion(file,
+                                                   context, result)
+
+
     def _GetOutputFile(self, context, kind, path):
 
-        base = os.path.basename(path)
+        if context.has_key("V3Test.compiler_output_dir"):
+            dir = context["V3Test.compiler_output_dir"]
+            srcdir = self.GetDatabase().GetRoot()
+            path = os.path.normpath(path)
+            srcdir = os.path.normpath(srcdir)
+            assert path.startswith(srcdir)
+            base = path[len(srcdir):]
+            base = base.replace("/", "_")
+        else:
+            dir = context.GetTemporaryDirectory()
+            base = os.path.basename(path)
+
         if kind != self.KIND_PRECOMPILE:
             base = os.path.splitext(base)[0]
         base += { DGTest.KIND_PREPROCESS : ".i",
@@ -393,7 +515,7 @@ class V3DGTest(DGTest, GCCTestBase):
                   GCCTestBase.KIND_PRECOMPILE : ".gch",
                   }[kind]
 
-        return os.path.join(context.GetTemporaryDirectory(), base)
+        return os.path.join(dir, base)
 
 
     def _DGrequire_iconv(self, line_num, args, context):
@@ -415,6 +537,16 @@ class V3DGTest(DGTest, GCCTestBase):
             return
 
         charset = args[0]
+
+        # First check to see if we have a compiler.  We can't do
+        # anything useful without one.
+        if not self._HaveCompiler(context):
+            # No compiler; we'll go ahead and hope for the best.
+            # Better would be to save the test programs to the output
+            # directory, but this is difficult; on the other hand, not
+            # doing so may cause spurious failures if a character set is
+            # not in fact supported by our local libiconv...
+            return
 
         # Check to see if iconv does exist and work.
         # First by creating and compiling a test program...
@@ -439,9 +571,9 @@ int main (void)
         compiler = context["CompilerTable.compiler_table"][self._language]
         options = []
 
-        options += context["V3Init.basic_cxx_flags"]
-        options += context["V3Init.default_cxx_flags"]
-        libpaths = context["V3Init.libpaths"]
+        options += context["V3Test.basic_cxx_flags"]
+        options += context["V3Test.default_cxx_flags"]
+        libpaths = context["V3Test.libpaths"]
         options += ["-L" + p for p in libpaths]
 
         if context.has_key("GCCTest.libiconv"):
@@ -471,6 +603,7 @@ int main (void)
 
 
 
+# How the real GCC tree does things:
 # check-abi first builds
 #    abi_check
 #    baseline_symbols
@@ -484,12 +617,12 @@ int main (void)
 #
 #
 # new-abi-baseline is what actually generates a new baseline.
-# it does it with ${extract_symvers} ../src/.libs/libstdc++.so ${baseline_file}
+# It does it with ${extract_symvers} ../src/.libs/libstdc++.so ${baseline_file}
 # baseline_file = ${baseline_dir}/baseline_symbols.txt
 # baseline_dir is set by autoconf to some mad thing...
 #    $glibcxx_srcdir/config/abi/${abi_baseline_pair}\$(MULTISUBDIR)"
 # abi_baseline_pair is set by autoconf to host_cpu-host_os by default.
-# but there are some special cases, in particular:
+# But there are some special cases, in particular:
 #    x86_64-*-linux*     -> x86_64-linux-gnu
 #    alpha*-*-freebsd5*  -> alpha-freebsd5
 #    i*86-*-freebsd4*    -> i386-freebsd4
@@ -497,9 +630,10 @@ int main (void)
 #    sparc*-*-freebsd5*  -> sparc-freebsd5
 #
 # extract_symvers = $(glibcxx_srcdir)/scripts/extract_symvers
-# extract_symvers is actually just a shell script
+# extract_symvers is actually just a shell script; we don't need to
+# compile it.
         
-class V3ABITest(Test):
+class V3ABITest(Test, V3Base):
     """A 'V3ABITest' checks the ABI of libstdc++ against a baseline.
 
     Depends on context variable 'V3Test.abi_baseline_file'."""
@@ -509,24 +643,47 @@ class V3ABITest(Test):
         # Some variables we'll need throughout.
         executable = RedirectedExecutable()
         tmpdir = context.GetTemporaryDirectory()
-        outdir = context["V3Init.outdir"]
+        outdir = context["V3Test.outdir"]
         srcdir = self.GetDatabase().GetRoot()
+        if context.has_key("V3Test.compiler_output_dir"):
+            compiler_outdir = context["V3Test.compiler_output_dir"]
+        else:
+            compiler_outdir = None
 
         # First we make sure that the abi_check program exists.
-        abi_check = os.path.join(outdir, "abi_check")
-        status = executable.Run(["make", "abi_check"], dir=outdir)
-        result["make_abi_check_stdout"] = ("<pre>" + executable.stdout
-                                           + "</pre>")
-        result["make_abi_check_stderr"] = ("<pre>" + executable.stderr
-                                           + "</pre>")
-        result["make_abi_check_status"] = str(status)
-        if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
-            result.SetOutcome(result.ERROR, "Error building abi_check")
-            return
+        if not self._HaveCompiler(context):
+            # If we have no compiler, we must find it in the compiler
+            # output dir.
+            if compiler_outdir is None:
+                result.SetOutcome(result.ERROR,
+                                  "No compiler output dir, "
+                                  "but no compiler either.")
+                return
+            abi_check = os.path.join(compiler_outdir, "abi_check")
+        else:
+            # Otherwise, we have to try building it.
+            abi_check = os.path.join(outdir, "abi_check")
+            status = executable.Run(["make", "abi_check"], dir=outdir)
+            quote = result.Quote
+            result["make_abi_check_stdout"] = quote(executable.stdout)
+            result["make_abi_check_stderr"] = quote(executable.stderr)
+            result["make_abi_check_status"] = str(status)
+            if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+                result.SetOutcome(result.ERROR,
+                                  "Error building abi_check")
+                return
+            # Ensure that the abi_check program does end up in the
+            # compiler output dir, if necessary.
+            if compiler_outdir is not None:
+                shutil.copy(abi_check,
+                            os.path.join(compiler_outdir, "abi_check"))
+        
         if not os.path.isfile(abi_check):
             result.SetOutcome(result.ERROR,
-                              "No abi_check program '%s'" % abi_check)
+                              "No abi_check program '%s'"
+                              % abi_check)
             return
+
 
         # Now make sure the baseline file exists.
         baseline_type = self._GetAbiName(context["DejaGNUTest.target"])
@@ -554,12 +711,12 @@ class V3ABITest(Test):
             return
 
         # Extract the current symbols.
-        # First use ldd to find the libstdc++ in use.
-        status = executable.Run(["ldd", "abi_check"], dir=outdir)
-        result["ldd_stdout"] = ("<pre>" + executable.stdout
-                                            + "</pre>")
-        result["ldd_stderr"] = ("<pre>" + executable.stderr
-                                            + "</pre>")
+        # First use ldd to find the libstdc++ in use.  'abi_check' is a
+        # handy C++ program; we'll check which library it's linked
+        # against.
+        status = executable.Run(["ldd", abi_check], dir=outdir)
+        result["ldd_stdout"] = result.Quote(executable.stdout)
+        result["ldd_stderr"] = result.Quote(executable.stderr)
         result["ldd_status"] = str(status)
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
             result.SetOutcome(result.ERROR,
@@ -580,10 +737,9 @@ class V3ABITest(Test):
         status = executable.Run([extract_symvers,
                                  libstdcpp,
                                  curr_symbols])
-        result["extract_symvers_stdout"] = ("<pre>" + executable.stdout
-                                            + "</pre>")
-        result["extract_symvers_stderr"] = ("<pre>" + executable.stderr
-                                            + "</pre>")
+        quote = result.Quote
+        result["extract_symvers_stdout"] = quote(executable.stdout)
+        result["extract_symvers_stderr"] = quote(executable.stderr)
         result["extract_symvers_status"] = str(status)
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
             result.SetOutcome(result.ERROR, "Error extracting symbols")
@@ -597,10 +753,9 @@ class V3ABITest(Test):
         # latter.
         status = executable.Run([abi_check, "--check-verbose",
                                  curr_symbols, baseline_file])
-        result["comparison_stdout"] = ("<pre>" + executable.stdout
-                                            + "</pre>")
-        result["comparison_stderr"] = ("<pre>" + executable.stderr
-                                            + "</pre>")
+        quote = result.Quote
+        result["comparison_stdout"] = quote(executable.stdout)
+        result["comparison_stderr"] = quote(executable.stderr)
         result["comparison_status"] = str(status)
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
             result.SetOutcome(result.ERROR,

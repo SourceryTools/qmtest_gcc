@@ -1,4 +1,6 @@
-#!/usr/bin/python 
+#!/usr/bin/env python 
+
+# Note that this script must be run with Python 2.3.
 
 import sys
 import os
@@ -20,8 +22,8 @@ optparser.add_option("-v", "--version", action="store",
                      help="Package version (default 1.0)")
 optparser.add_option("-o", "--output", action="store",
                      dest="targetdir", metavar="DIR",
-                     help="Output directory"
-                     "(default qmtest_libstdcpp_GCCVER-PKGVER)")
+                     help="Output directory "
+                     "(default: qmtest_libstdcpp_GCCVER-PKGVER)")
 optparser.add_option("-f", "--force", action="store_true",
                      dest="force", default=False,
                      help="If output directory already exists, delete it")
@@ -29,13 +31,10 @@ optparser.add_option("-a", "--add-results", action="append",
                      dest="baselines", default=[],
                      help="Additional result file to distribute (may be "
                      "used multiple times)")
-
-
-def usage(name):
-    print "Usage: %s <full-gcc-version> <source-directory> " \
-          "<destination-directory>" % name
-    print "E.g., %s 3.3.3 gcc-3.3.3 my-gcc-3.3.3-package" % name
-    sys.exit(2)
+optparser.add_option("-c", "--config-guess", action="store",
+                     dest="config_guess", metavar="FILE",
+                     help="Path to config.guess "
+                     "(default: search in /usr/share/)")
 
 
 def ensure_dir(dir):
@@ -54,8 +53,36 @@ def ensure_dir(dir):
         os.mkdir(dir)
         
 
-def main(name, args):
+def add(source_file_or_dir, *target_path):
+    dest = os.path.join(*target_path)
+    ensure_dir(os.path.dirname(dest))
+    if os.path.isfile(source_file_or_dir):
+        shutil.copy(source_file_or_dir, dest)
+    elif os.path.isdir(source_file_or_dir):
+        shutil.copytree(source_file_or_dir, dest)
+    else:
+        assert 0, "add() must be given a file or directory"
 
+
+def generate(source_string, substitutions, *target_path):
+    dest = os.path.join(*target_path)
+    ensure_dir(os.path.dirname(dest))
+    f = open(dest, "w")
+    f.write(source_string % substitutions)
+    f.close()
+
+
+class InstallRecorder(object):
+    def __init__(self, file_to_record_in):
+        ensure_dir(os.path.dirname(file_to_record_in))
+        self._file = open(file_to_record_in, "w")
+    def __call__(self, path):
+        self._file.write("%s\n" % path)
+
+
+def main(fullname, args):
+
+    name = os.path.basename(fullname)
     options, args = optparser.parse_args(args)
     if len(args) != 4:
         optparser.error("Wrong number of arguments")
@@ -80,41 +107,46 @@ def main(name, args):
         sys.exit(2)
 
     v3src = j(srcdir, "libstdc++-v3")
-    ensure_dir(targetdir)
 
     # Open a file to record which directories exist (and thus need
     # installing).
-    content_files = open(j(targetdir, "contents"), "w")
+    install = InstallRecorder(j(targetdir, "share-contents"))
 
-    # Mark that this will be a standalone installation, for later use by
-    # the QMTest scripts.
-    f = open(j(targetdir, "THIS-IS-STANDALONE-V3"), "w")
-    # In case we need to version stuff later:
-    f.write("1\n")
-    f.close()
-    content_files.write("THIS-IS-STANDALONE-V3\n")
+    # Put 'config.guess' in.
+    if options.config_guess is None:
+        config_guesses = glob.glob("/usr/share/*/config.guess")
+        if not config_guesses:
+            optparser.error("Cannot find config.guess, use "
+                            "--config-guess") 
+        config_guess = config_guesses[0]
+    else:
+        config_guess = options.config_guess
+    add(config_guess, targetdir, "config.guess")
+
+    # Mark that this will be a standalone installation, for later
+    # detection by the QMTest harness.  We write the numeral '1' in case
+    # we need versioning information later.
+    generate("1\n", {}, targetdir, "THIS-IS-STANDALONE-V3")
+    install("THIS-IS-STANDALONE-V3")
 
     # Copy gcc stuff over:
-    shutil.copytree(j(v3src, "testsuite"), j(targetdir, "testsuite"))
-    content_files.write("testsuite\n")
-    shutil.copytree(j(v3src, "po"), j(targetdir, "po"))
-    content_files.write("po\n")
+    add(j(v3src, "testsuite"), targetdir, "testsuite")
+    install("testsuite")
+    add(j(v3src, "po"), targetdir, "po")
+    install("po")
     ensure_dir(j(targetdir, "config"))
-    shutil.copytree(j(v3src, "config", "abi"),
-                    j(targetdir, "config", "abi"))
-    content_files.write("config\n")
+    add(j(v3src, "config", "abi"), targetdir, "config", "abi")
+    install("config")
     
     # gcc 3.4 has a scripts dir that we need.
     if os.path.exists(j(v3src, "scripts")):
-        shutil.copytree(j(v3src, "scripts"), j(targetdir, "scripts"))
-        content_files.write("scripts\n")
+        add(j(v3src, "scripts"), targetdir, "scripts")
+        install("scripts")
 
     # Copy in QMTest extension classes.
-    ensure_dir(j(targetdir, "qm-classes"))
-    content_files.write("qm-classes\n")
-    shutil.copytree(qmtcdir, j(targetdir, "qm-classes", "qmtc"))
-    shutil.copytree(qmtest_gccdir,
-                    j(targetdir, "qm-classes", "qmtest_gcc"))
+    add(qmtcdir, targetdir, "qm-classes", "qmtc")
+    add(qmtest_gccdir, targetdir, "qm-classes", "qmtest_gcc")
+    install("qm-classes")
     # And then clean them up a bit (remove backup files, compiled files,
     # and CVS/ directories).
     for g in "*~", "*.pyc", "*.pyo":
@@ -125,48 +157,50 @@ def main(name, args):
 
     # Copy over any supplied baselines.
     ensure_dir(j(targetdir, "qm-baselines"))
-    content_files.write("qm-baselines\n")
+    install("qm-baselines")
     for b in options.baselines:
-        shutil.copyfile(b, j(targetdir, "qm-baselines",
-                             os.path.basename(b)))
+        add(b, targetdir, "qm-baselines", os.path.basename(b))
 
-    # Now create the misc. files.
-    miscdir = j(targetdir, "qm-misc")
-    ensure_dir(miscdir)
-    content_files.write("qm-misc\n")
+    # Copy this script into the package.
+    add(__file__, targetdir, "build_v3_dist")
 
+    # Set up the substitutions dict used by all our templates.
     substitutions = {"prog_name": name,
+                     "prog_fullname": fullname,
                      "gcc_version": gcc_version,
                      "pkg_version": pkg_version,
                      "prog_args": " ".join(args),
                      "user": getpass.getuser(),
-                     "time": time.strftime("%Y-%m-%d %H:%M:%S "),
+                     "time": time.strftime("%Y-%m-%d %H:%M:%S"),
                      }
 
-    f = open(j(miscdir, "locale-Makefile"), "w")
-    f.write(locale_Makefile % substitutions)
-    f.close()
-
-    f = open(j(miscdir, "util-Makefile"), "w")
-    f.write(util_Makefile % substitutions)
-    f.close()
-
-    # And the distribution-level files.
-    f = open(j(targetdir, "README"), "w")
-    f.write(README_file % substitutions)
-    f.close()
-
-    f = open(j(targetdir, "PKGINFO"), "w")
-    f.write(PKGINFO_file % substitutions)
-    f.close()
-
-    f = open(j(targetdir,
-               "qmtest_libstdcpp_%(gcc_version)s.spec"
-               % substitutions),
-             "w")
-    f.write(spec_file % substitutions)
+    # Munge testsuite_hooks.h to make testsuite executables
+    # relocatable.
+    f = open(j(targetdir, "testsuite", "testsuite_hooks.h"), "a")
+    f.write(testsuite_hooks_addendum % substitutions)
     f.close()
     
+    # Now create the misc. files.
+    miscdir = j(targetdir, "qm-misc")
+    ensure_dir(miscdir)
+    install("qm-misc")
+
+    generate(locale_Makefile, substitutions, miscdir, "locale-Makefile")
+
+    generate(util_Makefile, substitutions, miscdir, "util-Makefile")
+
+    # And the distribution-level files.
+    generate(README_file, substitutions, targetdir, "README")
+    generate(PKGINFO_file, substitutions, targetdir, "PKGINFO")
+    generate(spec_file, substitutions,
+             targetdir, "qmtest_libstdcpp_%(gcc_version)s.spec"
+                        % substitutions)
+    generate(build_binary_testsuite_file, substitutions,
+             targetdir, "build_binary_testsuite")
+    os.chmod(j(targetdir, "build_binary_testsuite"), 0755)
+    
+
+## All the templates for generated files:
 
 locale_Makefile = """\
 # Do not edit -- this file automatically generated by %(prog_name)s.
@@ -348,7 +382,7 @@ There are four steps required to run the testsuite:
      CompilerTable.cplusplus_path=g++
      CompilerTable.cplusplus_options=
      DejaGNUTest.target=i686-pc-linux-gnu
-     V3Init.scratch_dir=scratch
+     V3Test.scratch_dir=scratch
 
   You should adjust the "DejaGNUTest.target" line to indicate the GNU
   triplet for your operating system.
@@ -386,12 +420,23 @@ There are four steps required to run the testsuite:
     http://www.codesourcery.com/qm/qmtest_manual
 """
 
+testsuite_hooks_addendum = """
+
+// Following added automatically by %(prog_name)s:
+#ifdef LOCALEDIR
+#error "LOCALEDIR should not be defined for standalone testing; \
+set environment variable V3_LOCALEDIR instead"
+#endif
+#include <cstdlib>
+#define LOCALEDIR (std::getenv("V3_LOCALEDIR"))
+"""
+
 PKGINFO_file = """\
 This package generated automatically by %(prog_name)s.
 
 Invoked by %(user)s at %(time)s.
 Call was:
-  $ %(prog_name)s %(prog_args)s
+  $ %(prog_fullname)s %(prog_args)s
 
 """
 
@@ -407,7 +452,10 @@ Group:       Development/Tools
 BuildRoot:   %%{_tmppath}/%%{name}-buildroot
 Source:      qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
 Vendor:      CodeSourcery LLC
-BuildArchitectures: noarch
+# If we let RPM detect dependencies, it will get the idea that this
+# package requires a specific version of libstdc++.so, and that is
+# unhelpful:
+AutoReqProv: no
 
 %%description
 This package includes the libstdc++-v3 testsuite from gcc version
@@ -421,15 +469,25 @@ testsuite against an installed version of libstdc++.
 
 %%install
 rm -rf $RPM_BUILD_ROOT
-DIR=$RPM_BUILD_ROOT/usr/share/qmtest_libstdcpp_%(gcc_version)s
-mkdir -p $DIR
-for thing in `cat contents`; do
+
+# We do the building first, because some of the files generated will be
+# installed later.
+LIBDIR=$RPM_BUILD_ROOT/usr/lib/qmtest_libstdcpp_%(gcc_version)s
+mkdir -p `dirname $LIBDIR`
+./build_binary_testsuite $LIBDIR 2>&1 | tee BUILD-DETAILS
+
+SHAREDIR=$RPM_BUILD_ROOT/usr/share/qmtest_libstdcpp_%(gcc_version)s
+mkdir -p $SHAREDIR
+for thing in `cat share-contents`; do
     if [ -d "$thing" ]; then
-        cp -r "$thing" "$DIR/$thing"
+        cp -r "$thing" "$SHAREDIR/$thing"
     else
-        cp "$thing" "$DIR/$thing"
+        cp "$thing" "$SHAREDIR/$thing"
     fi
 done
+
+find $LIBDIR -name '*.pyc' -o -name '*.pyo' -print0 | xargs -0 rm -f
+find $SHAREDIR -name '*.pyc' -o -name '*.pyo' -print0 | xargs -0 rm -f
 
 %%clean
 rm -rf $RPM_BUILD_ROOT
@@ -438,13 +496,239 @@ rm -rf $RPM_BUILD_ROOT
 # Install all files as root:
 %%defattr(-,root,root)
 /usr/share/qmtest_libstdcpp_%(gcc_version)s/
+/usr/lib/qmtest_libstdcpp_%(gcc_version)s/
 %%doc README
+%%doc PKGINFO
+%%doc BUILD-DETAILS
+%%doc executable-gen.qmr
+%%doc build_v3_dist
+%%doc build_binary_testsuite
 
 %%changelog
+* Mon Mar 29 2004 Nathaniel Smith <njs@codesourcery.com> 
+- Rework for no-compiler version of testsuite.
+
 * Tue Mar 16 2004 Nathaniel Smith <njs@codesourcery.com> 
 - Initial release.
 
 """
 
+
+build_binary_testsuite_file = """\
+#!/usr/bin/env python
+
+# This script builds the executables needed for testing libstdc++
+# without a compiler, and then runs the tests to generate a baseline.
+# You should ensure that a canonical version of g++ is in your PATH, and
+# a canonical version of libstdc++ in your LD_LIBRARY_PATH, before
+# running this script; they will be taken as the gold standard against
+# which tested versions will be compared.
+#
+# It must be run from the directory that contains the standalone V3
+# distribution.
+
+usage = \"\"\"\\
+Usage:
+    %%(progname)s [executable-output-directory] [g++ to use] \\\\
+       [directory containing libstdc++ to use]
+If the first argument is not given, it defaults to "qm-executables".  If
+the last two arguments are not given, defaults will be found in
+PATH/LD_LIBRARY_PATH.
+\"\"\"
+
+import sys
+import os
+import os.path
+import tempfile
+import shutil
+import atexit
+import glob
+
+def error(*msgs):
+    sys.stderr.write("ERROR: " + "".join(msgs) + "\\n")
+    sys.stderr.flush()
+
+def log(*msgs):
+    prefix = "%%s: " %% progname
+    sys.stdout.write(prefix  + "".join(msgs) + "\\n")
+    sys.stdout.flush()
+
+def run_and_log(cmdline, failure_ok=False):
+    log("Running command: %%s" %% cmdline)
+    log("Output:")
+    status = os.system(cmdline)
+    if status != 0 and not failure_ok:
+        error("Command did not complete successfully.")
+        error("Exit status: %%i" %% status)
+        sys.exit(1)
+    log("Execution complete, status = %%i." %% status)
+    return status
+
+def resolve_executable(name):
+    if os.path.isabs(name):
+        return name
+    if os.sep in name:
+        return os.path.abspath(name)
+    log("Searching PATH for %%s." %% name)
+    path = os.environ.get("PATH", "").split(os.pathsep)
+    for dir in path:
+        candidate = os.path.join(dir, name)
+        if os.path.exists(candidate):
+            return os.path.abspath(candidate)
+    error("Cannot find executable %%s." %% name)
+    sys.exit(1)
+
+if not os.path.exists("THIS-IS-STANDALONE-V3"):
+    error("must run from root of standalone libstdc++ test "
+          "distribution.")
+    sys.exit(2)
+
+# This global variable is used directly by log().
+full_progname = sys.argv[0]
+progname = os.path.basename(full_progname)
+args = sys.argv[1:]
+
+log("Called as: %%s %%s" %% (full_progname, " ".join(args)))
+
+## Process arguments.
+if not 0 <= len(args) <= 3:
+    error("bad command line.")
+    sys.stderr.write(usage %% {"progname": progname})
+    sys.exit(2)
+
+## Find compiler output directory.
+if args:
+    compiler_output_dir = args.pop(0)
+else:
+    compiler_output_dir = "qm-executables"
+
+## Find g++.
+if args:
+    gpp_path = args.pop(0)
+else:
+    gpp_path = "g++"
+gpp_path = resolve_executable(gpp_path)
+
+log("Using g++: %%s" %% gpp_path)
+run_and_log("%%s --version" %% gpp_path)
+log()
+
+## Find libstdc++.
+if args:
+    libstdcpp_path = args.pop(0)
+    curr = os.environ.get("LD_LIBRARY_PATH", "")
+    new = "%%s:%%s" %% (libstdcpp_path, curr)
+    os.environ["LD_LIBRARY_PATH"] = new
+
+log('Using LD_LIBRARY_PATH="%%s".'
+    %% os.environ.get("LD_LIBRARY_PATH", ""))
+log()
+
+## Find qmtest.
+qmtest_path = resolve_executable("qmtest")
+log("Using qmtest: %%s" %% qmtest_path)
+run_and_log("%%s --version" %% qmtest_path)
+log()
+
+## Set up the compiler output directory.
+if os.path.exists(compiler_output_dir):
+    error("output directory %%s already exists." %% compiler_output_dir)
+    sys.exit(1)
+
+os.mkdir(compiler_output_dir)
+
+## Create the temporary scratch directory.
+if hasattr(tempfile, "mkdtemp"):
+    tmpdir = tempfile.mkdtemp()
+else:
+    tmpdir = tempfile.mktemp()
+    os.mkdir(tmpdir)
+atexit.register(shutil.rmtree, tmpdir)
+
+## Find the target triplet.
+(config_guess_in, config_guess_out) = os.popen4("./config.guess")
+config_guess_in.close()
+target_triplet = config_guess_out.read()
+target_triplet = target_triplet.strip()
+assert "-" in target_triplet, "Bad target triplet"
+log("Using target triplet: %%s" %% target_triplet)
+log()
+
+## Create the basic context to use.
+log("Creating V3 context file.")
+context_path = os.path.join(tmpdir, "__v3_context__")
+f = open(context_path, "w")
+f.write(\"\"\"\\
+CompilerTable.languages=cplusplus
+CompilerTable.cplusplus_kind=GCC
+CompilerTable.cplusplus_options=
+CompilerTable.cplusplus_path=%%(gpp_path)s
+DejaGNUTest.target=%%(target_triplet)s
+V3Test.scratch_dir=%%(tmpdir)s
+V3Test.compiler_output_dir=%%(compiler_output_dir)s
+\"\"\" %% locals())
+f.close()
+
+## Set up QMTest environment variables.
+class_paths = [os.path.abspath(os.path.join("qm-classes", pkg))
+               for pkg in "qmtc", "qmtest_gcc"]
+qmtest_class_path = os.pathsep.join(class_paths)
+os.environ["QMTEST_CLASS_PATH"] = qmtest_class_path
+log('Using QMTEST_CLASS_PATH="%%s"' %% qmtest_class_path)
+log()
+
+## Create the test database we use.
+log("Creating V3 test database.")
+dbpath = os.path.join(tmpdir, "__v3_db__")
+srcdir = os.path.abspath("testsuite")
+run_and_log("qmtest -D %%(dbpath)s create-tdb "
+                     "-c v3_database.V3Database "
+                     "-a srcdir=%%(srcdir)s" %% locals())
+log()
+
+## Okay, we're ready to run the tests for the first time.
+log("Running QMTest to generate executables.")
+log("Results stored in executable-gen.qmr")
+status = run_and_log("qmtest -D %%(dbpath)s run "
+                     "-C %%(context_path)s --format=brief "
+                     "-o executable-gen.qmr"
+                     %% locals(),
+                     failure_ok=True)
+if status == 0 or (os.WIFEXITED(status) and os.WEXITSTATUS(status) == 1):
+    log("Acceptable output status.")
+else:
+    error("qmtest exited unsuccessfully.")
+    sys.exit(1)
+
+## Clean the irrelevant non-executable output files; they take up a lot of
+## space.
+log("Cleaning up executable directory.")
+for junk in glob.glob(os.path.join(compiler_output_dir, "*.[sio]")):
+    os.unlink(junk)
+    log("    Deleted: %%s" %% junk)
+
+## We have the executables; all is well.  Now we'll run it again to
+## generate the baseline result file.
+log("Running QMTest again to generate baseline results.")
+baseline_basename = "%%s.qmr" %% target_triplet
+baseline = os.path.abspath(os.path.join("qm-baselines",
+                                        baseline_basename))
+log("Results stored in %%s" %% baseline)
+run_and_log("qmtest -D %%(dbpath)s run "
+            "-C %%(context_path)s --format=brief "
+            "-c V3Test.have_compiler=no "
+            "-o %%(baseline)s"
+            %% locals(),
+            failure_ok=True)
+if status == 0 or (os.WIFEXITED(status) and os.WEXITSTATUS(status) == 1):
+    log("Acceptable output status.")
+else:
+    error("qmtest exited unsuccessfully.")
+    sys.exit(1)
+
+## All done.
+log("All done.")
+"""
+        
 if __name__ == "__main__":
     main(sys.argv[0], sys.argv[1:])

@@ -82,7 +82,7 @@ class GPPInit(Resource, DejaGNUBase):
                                 "testsuite_flags"),
                    "--build-includes"]
         result["GPPInit.testsuite_flags_command"] \
-            = "<pre>" + " ".join(command) + "</pre>"
+            = result.Quote(" ".join(command))
         try:
             executable = RedirectedExecutable()
             executable.Run(command)
