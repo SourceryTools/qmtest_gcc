@@ -103,18 +103,23 @@ class GCCDGDebugTest(GCCDGTest):
 
         basename = os.path.basename(self._GetSourcePath())
             
+        def isanywhere(string, list):
+            for s in list:
+                if s.find(string) != -1:
+                    return True
+            return False
+
         self._SetUp(context)
         for opts in context[GCCDebugInit.OPTIONS_TAG]:
-            optstring = " ".join(opts)
             if (basename in ["debug-1.c", "debug-2.c", "debug-6.c"]
                 and opts[0].endswith("1")):
                 continue
             elif (basename in ["debug-1.c", "debug-2.c"]
-                  and optstring.find("03") != -1
-                  and (optstring.find("coff") != -1
-                       or optstring.find("stabs") != -1)):
+                  and isanywhere("03", opts) != -1
+                  and (isanywhere("coff", opts) != -1
+                       or isanywhere("stabs", opts) != -1)):
                 continue
-            self._RunDGTest(optstring, "", context, result)
+            self._RunDGTest(opts, [], context, result)
 
 
 

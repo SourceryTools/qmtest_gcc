@@ -20,6 +20,7 @@ from   compiler_table import CompilerTable
 from   dejagnu_base import DejaGNUBase
 from   qm.executable import RedirectedExecutable
 from   qm.test.resource import Resource
+from   qm.test.result import Result
 import os
 import sys
 
@@ -87,8 +88,8 @@ class GPPInit(Resource, DejaGNUBase):
             executable.Run(command)
             options += executable.stdout.split()
         except:
-            result.Fail("Could not run testsuite_flags")
-            result[result.EXCEPTION] = "%s: %s" % sys.exc_info()[:2]
+            result.NoteException("Could not run testsuite_flags",
+                                 Result.FAIL)
             return
 
         # Avoid splitting diagnostic message lines.

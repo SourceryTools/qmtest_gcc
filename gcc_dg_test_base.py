@@ -63,7 +63,7 @@ class GCCDGTestBase(DGTest):
     def Run(self, context, result):
 
         self._SetUp(context)
-        self._RunDGTest("", self._default_options, context, result)
+        self._RunDGTest([], self._default_options, context, result)
                         
 
     def _ExecuteFinalCommand(self, command, args, context, result):
@@ -160,7 +160,6 @@ class GCCDGTestBase(DGTest):
             dirname = os.path.dirname(path)
             source_files += map(lambda f: os.path.join(dirname, f),
                                 self.__additional_source_files)
-        options = self._ParseTclWords(options)
         if "-frepo" in options:
             is_repo_test = 1
             kind = DGTest.KIND_ASSEMBLE
@@ -220,6 +219,9 @@ class GCCDGTestBase(DGTest):
 
         This method emulates 'dg-scan' in the GCC testsuite."""
 
+        print "__ScanFile: %s, %s, %s" % tuple(map(repr, [command,
+                                                    output_file, args]))
+
         # See if there is a target selector applied to this test.
         expectation = self.PASS
         if len(args) > 1:
@@ -247,7 +249,13 @@ class GCCDGTestBase(DGTest):
             outcome = self.PASS
         else:
             outcome = self.FAIL
-        message = self._name + " " + command + " " + pattern
+        print "Pattern is %s" % repr(pattern)
+        printable_pattern = pattern
+        for old, new in [("\\", "\\\\"), ("\n", "\\n"),
+                         ("\r", "\\r"),  ("\t", "\\t")]:
+            printable_pattern = printable_pattern.replace(old, new)
+        print "Printable pattern is %s" % repr(printable_pattern)
+        message = self._name + " " + command + " " + printable_pattern
         self._RecordDejaGNUOutcome(result, outcome, message, expectation)
         
 

@@ -65,7 +65,7 @@ class DGPCHTest:
                 pass
             shutil.copyfile(os.path.splitext(source)[0] + suffix + "s",
                             basename + suffix)
-            self._RunDGTest(o, "", context, result,
+            self._RunDGTest(o, [], context, result,
                             basename + suffix,
                             self.KIND_PRECOMPILE,
                             keep_output = 1)
@@ -73,15 +73,15 @@ class DGPCHTest:
             assembly_outcome = self.UNTESTED
             if os.path.exists(basename + suffix + ".gch"):
                 os.remove(basename + suffix)
-                options = o + " -I" + context.GetTemporaryDirectory()
-                self._RunDGTest(options, "", context, result, keep_output = 1)
+                options = o + ["-I" + context.GetTemporaryDirectory()]
+                self._RunDGTest(options, [], context, result, keep_output = 1)
                 os.remove(basename + suffix + ".gch")
                 if os.path.exists(basename + ".s"):
                     os.rename(basename + ".s", basename + ".s-gch")
                     shutil.copyfile((os.path.splitext(source)[0]
                                      + suffix + "s"),
                                     basename + suffix)
-                    self._RunDGTest(options, "", context, result,
+                    self._RunDGTest(options, [], context, result,
                                     keep_output = 1)
                     if filecmp.cmp(basename + ".s", basename + ".s-gch"):
                         assembly_outcome = self.PASS
@@ -104,7 +104,7 @@ class GCCDGPCHTest(DGPCHTest, GCCDGTortureTest):
 
     _suffix = ".h"
 
-    _pch_options = ["-O0 -g"] + GCCDGTortureTest._torture_without_loops
+    _pch_options = [["-O0", "-g"]] + GCCDGTortureTest._torture_without_loops
 
 
 
@@ -113,5 +113,5 @@ class GPPDGPCHTest(DGPCHTest, GPPDGTest):
 
     _suffix = ".H"
 
-    _pch_options = ("-g", "-O2 -g", "-O2")
+    _pch_options = (["-g"], ["-O2", "-g"], ["-O2"])
     

@@ -30,7 +30,7 @@ class GCCDGTest(GCCDGTestBase, GCCTestBase):
     This test class emulates the 'gcc-dg.exp' source file in the GCC
     testsuite."""
 
-    _default_options = "-ansi -pedantic-errors"
+    _default_options = ["-ansi", "-pedantic-errors"]
 
     def _DGrequire_weak(self, line_num, args, context):
         """Emulate the 'dg-require-weak' command.
@@ -99,7 +99,7 @@ class GCCDGNoncompileTest(GCCDGTest):
     This test class emulates the 'noncompile.exp' source file in the
     GCC testsuite."""
 
-    _default_options = ""
+    _default_options = []
     
 
 
@@ -109,7 +109,7 @@ class GCCDGCPPTest(GCCDGTestBase, GCCTestBase):
     This test class emulates the 'cpp.exp' source file in the GCC
     testsuite."""
 
-    _default_options = "-ansi -pedantic-errors"
+    _default_options = ["-ansi", "-pedantic-errors"]
 
 
 
@@ -119,24 +119,25 @@ class GCCDGCPPTradTest(GCCDGTestBase, GCCTestBase):
     This test class emulates the 'trad.exp' source file in the GCC
     testsuite."""
 
-    _default_options = "-traditional-cpp"
+    _default_options = ["-traditional-cpp"]
 
 
 
 class GCCDGTortureTest(GCCDGTest):
     """A 'GCCDGTortureTest' emulates 'gcc.dg/torture/dg-torture.exp'."""
 
-    _default_options = ""
+    _default_options = []
 
     _torture_with_loops = [
-        "-O0",
-        "-O1",
-        "-O2",
-        "-O3 -fomit-frame-pointer",
-        "-O3 -fomit-frame-pointer -funroll-loops",
-        "-O3 -fomit-frame-pointer -funroll-all-loops -finline-functions",
-        "-O3 -g",
-        "-Os"
+        ["-O0"],
+        ["-O1"],
+        ["-O2"],
+        ["-O3", "-fomit-frame-pointer"],
+        ["-O3", "-fomit-frame-pointer", "-funroll-loops"],
+        ["-O3", "-fomit-frame-pointer",
+         "-funroll-all-loops", "-finline-functions"],
+        ["-O3", "-g"],
+        ["-Os"],
         ]
     """A list of command-line options to use for "torture" tests.
 
@@ -207,7 +208,7 @@ class GCCDGTortureTest(GCCDGTest):
 class GCCDGFormatTest(GCCDGTortureTest):
     """A 'GCCDGFormatTest' emulates 'gcc.dg/format/format.exp'."""
 
-    _default_options = ""
+    _default_options = []
     
     _torture_with_loops = [ "", "-DWIDE" ]
 
@@ -220,4 +221,4 @@ class GCCCTortureCompileTest(GCCDGTortureTest):
 
     _default_kind = GCCDGTortureTest.KIND_ASSEMBLE
     
-    _default_options = "-w"
+    _default_options = ["-w"]

@@ -1,2 +1,36 @@
 <?xml version="1.0" ?>
-<class-directory><class kind="database">gcc_database.GCCDatabase</class><class kind="resource">gpp_init.GPPInit</class><class kind="resource">dg_tls_test.GPPTLSInit</class><class kind="test">dg_tls_test.GPPDGTLSTest</class><class kind="resource">debug_test.GPPDebugInit</class><class kind="test">gpp_dg_test.GPPDGTest</class><class kind="test">gpp_profile_test.GPPProfileTest</class><class kind="test">gpp_gcov_test.GPPGCOVTest</class><class kind="test">gpp_old_deja_test.GPPOldDejaTest</class><class kind="test">gcc_dg_test.GCCDGTest</class><class kind="test">gcc_dg_test.GCCDGNoncompileTest</class><class kind="resource">debug_test.GCCDebugInit</class><class kind="test">debug_test.GPPDGDebugTest</class><class kind="test">debug_test.GCCDGDebugTest</class><class kind="test">gcc_dg_test.GCCDGCPPTradTest</class><class kind="test">dg_pch_test.GPPDGPCHTest</class><class kind="test">dg_pch_test.GCCDGPCHTest</class><class kind="test">gcc_dg_test.GCCDGCPPTest</class><class kind="test">gcc_dg_test.GCCDGFormatTest</class><class kind="resource">dg_tls_test.GCCTLSInit</class><class kind="test">dg_tls_test.GCCDGTLSTest</class><class kind="test">gcc_dg_test.GCCDGTortureTest</class><class kind="resource">gcc_init.GCCInit</class><class kind="test">compat_test.GCCCompatTest</class><class kind="test">compat_test.GPPCompatTest</class><class kind="test">gcc_dg_test.GCCCTortureCompileTest</class></class-directory>
+<!DOCTYPE class-directory
+  PUBLIC '-//QM/2.2/Class-Directory//EN'
+  'http://www.codesourcery.com/qm/dtds/2.2/-//qm/2.2/class-directory//en.dtd'>
+<class-directory>
+ <class kind="resource" name="gpp_init.GPPInit"/>
+ <class kind="resource" name="dg_tls_test.GPPTLSInit"/>
+ <class kind="resource" name="debug_test.GPPDebugInit"/>
+ <class kind="resource" name="debug_test.GCCDebugInit"/>
+ <class kind="resource" name="dg_tls_test.GCCTLSInit"/>
+ <class kind="resource" name="gcc_init.GCCInit"/>
+ <class kind="database" name="gcc_database.GCCDatabase"/>
+ <class kind="database" name="v3_database.V3Database"/>
+ <class kind="test" name="dg_tls_test.GPPDGTLSTest"/>
+ <class kind="test" name="gpp_dg_test.GPPDGTest"/>
+ <class kind="test" name="gpp_profile_test.GPPProfileTest"/>
+ <class kind="test" name="gpp_gcov_test.GPPGCOVTest"/>
+ <class kind="test" name="gpp_old_deja_test.GPPOldDejaTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGNoncompileTest"/>
+ <class kind="test" name="debug_test.GPPDGDebugTest"/>
+ <class kind="test" name="debug_test.GCCDGDebugTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGCPPTradTest"/>
+ <class kind="test" name="dg_pch_test.GPPDGPCHTest"/>
+ <class kind="test" name="dg_pch_test.GCCDGPCHTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGCPPTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGFormatTest"/>
+ <class kind="test" name="dg_tls_test.GCCDGTLSTest"/>
+ <class kind="test" name="gcc_dg_test.GCCDGTortureTest"/>
+ <class kind="test" name="compat_test.GCCCompatTest"/>
+ <class kind="test" name="compat_test.GPPCompatTest"/>
+ <class kind="test" name="gcc_dg_test.GCCCTortureCompileTest"/>
+ <class kind="test" name="v3_test.V3DGTest"/>
+ <class kind="test" name="v3_test.V3ABITest"/>
+ <class kind="resource" name="v3_test.V3Init"/>
+</class-directory>

@@ -29,7 +29,7 @@ class GPPDGTest(GCCDGTestBase, GPPTestBase):
     This test class emulates the 'g++-dg.exp' source file in the GCC
     testsuite."""
 
-    _default_options = "-ansi -pedantic-errors -Wno-long-long"
+    _default_options = ["-ansi", "-pedantic-errors", "-Wno-long-long"]
 
     def _GetTargetEnvironment(self, context):
 

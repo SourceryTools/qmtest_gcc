@@ -1,0 +1,450 @@
+#!/usr/bin/python 
+
+import sys
+import os
+import os.path
+import shutil
+import glob
+import getpass
+import time
+from optparse import OptionParser
+
+j = os.path.join
+
+optparser = OptionParser("usage: %prog [options] <gcc-version> "
+                         "<source-directory> <qmtc-directory> "
+                         "<qmtest_gcc-directory>")
+optparser.add_option("-v", "--version", action="store",
+                     dest="pkg_version", default="1.0",
+                     metavar="VERSION",
+                     help="Package version (default 1.0)")
+optparser.add_option("-o", "--output", action="store",
+                     dest="targetdir", metavar="DIR",
+                     help="Output directory"
+                     "(default qmtest_libstdcpp_GCCVER-PKGVER)")
+optparser.add_option("-f", "--force", action="store_true",
+                     dest="force", default=False,
+                     help="If output directory already exists, delete it")
+optparser.add_option("-a", "--add-results", action="append",
+                     dest="baselines", default=[],
+                     help="Additional result file to distribute (may be "
+                     "used multiple times)")
+
+
+def usage(name):
+    print "Usage: %s <full-gcc-version> <source-directory> " \
+          "<destination-directory>" % name
+    print "E.g., %s 3.3.3 gcc-3.3.3 my-gcc-3.3.3-package" % name
+    sys.exit(2)
+
+
+def ensure_dir(dir):
+    # Assume we're given foo/bar/baz/quux, and foo/bar already exists.
+    fragments = []
+    while dir:
+        if os.path.exists(dir):
+            break
+        dir, tail = os.path.split(dir)
+        fragments.insert(0, tail)
+    # Now dir == "foo/bar" and fragments == ["baz", "quux"]
+    # Iterate through the fragments, building up dir and creating
+    # directories.
+    for frag in fragments:
+        dir = j(dir, frag)
+        os.mkdir(dir)
+        
+
+def main(name, args):
+
+    options, args = optparser.parse_args(args)
+    if len(args) != 4:
+        optparser.error("Wrong number of arguments")
+
+    gcc_version, srcdir, qmtcdir, qmtest_gccdir = args
+    pkg_version = options.pkg_version
+    targetdir = options.targetdir
+    if targetdir is None:
+        targetdir = "./qmtest_libstdcpp_%s-%s" % (gcc_version,
+                                                  pkg_version)
+
+    if os.path.exists(targetdir):
+        if options.force:
+            shutil.rmtree(targetdir)
+        else:
+            print "Error: Target directory '%s' already exists and " \
+                  "deletion not requested" % targetdir
+            sys.exit(2)
+
+    if not gcc_version.startswith("3.3"):
+        print "Error: Unsupported gcc version %s" % gcc_version
+        sys.exit(2)
+
+    v3src = j(srcdir, "libstdc++-v3")
+    ensure_dir(targetdir)
+
+    # Open a file to record which directories exist (and thus need
+    # installing).
+    content_files = open(j(targetdir, "contents"), "w")
+
+    # Mark that this will be a standalone installation, for later use by
+    # the QMTest scripts.
+    f = open(j(targetdir, "THIS-IS-STANDALONE-V3"), "w")
+    # In case we need to version stuff later:
+    f.write("1\n")
+    f.close()
+    content_files.write("THIS-IS-STANDALONE-V3\n")
+
+    # Copy gcc stuff over:
+    shutil.copytree(j(v3src, "testsuite"), j(targetdir, "testsuite"))
+    content_files.write("testsuite\n")
+    shutil.copytree(j(v3src, "po"), j(targetdir, "po"))
+    content_files.write("po\n")
+    ensure_dir(j(targetdir, "config"))
+    shutil.copytree(j(v3src, "config", "abi"),
+                    j(targetdir, "config", "abi"))
+    content_files.write("config\n")
+    
+    # gcc 3.4 has a scripts dir that we need.
+    if os.path.exists(j(v3src, "scripts")):
+        shutil.copytree(j(v3src, "scripts"), j(targetdir, "scripts"))
+        content_files.write("scripts\n")
+
+    # Copy in QMTest extension classes.
+    ensure_dir(j(targetdir, "qm-classes"))
+    content_files.write("qm-classes\n")
+    shutil.copytree(qmtcdir, j(targetdir, "qm-classes", "qmtc"))
+    shutil.copytree(qmtest_gccdir,
+                    j(targetdir, "qm-classes", "qmtest_gcc"))
+    # And then clean them up a bit (remove backup files, compiled files,
+    # and CVS/ directories).
+    for g in "*~", "*.pyc", "*.pyo":
+        for file in glob.glob(j(targetdir, "qm-classes", "*", g)):
+            os.unlink(file)
+    for dir in glob.glob(j(targetdir, "qm-classes", "*", "CVS")):
+        shutil.rmtree(dir)
+
+    # Copy over any supplied baselines.
+    ensure_dir(j(targetdir, "qm-baselines"))
+    content_files.write("qm-baselines\n")
+    for b in options.baselines:
+        shutil.copyfile(b, j(targetdir, "qm-baselines",
+                             os.path.basename(b)))
+
+    # Now create the misc. files.
+    miscdir = j(targetdir, "qm-misc")
+    ensure_dir(miscdir)
+    content_files.write("qm-misc\n")
+
+    substitutions = {"prog_name": name,
+                     "gcc_version": gcc_version,
+                     "pkg_version": pkg_version,
+                     "prog_args": " ".join(args),
+                     "user": getpass.getuser(),
+                     "time": time.strftime("%Y-%m-%d %H:%M:%S "),
+                     }
+
+    f = open(j(miscdir, "locale-Makefile"), "w")
+    f.write(locale_Makefile % substitutions)
+    f.close()
+
+    f = open(j(miscdir, "util-Makefile"), "w")
+    f.write(util_Makefile % substitutions)
+    f.close()
+
+    # And the distribution-level files.
+    f = open(j(targetdir, "README"), "w")
+    f.write(README_file % substitutions)
+    f.close()
+
+    f = open(j(targetdir, "PKGINFO"), "w")
+    f.write(PKGINFO_file % substitutions)
+    f.close()
+
+    f = open(j(targetdir,
+               "qmtest_libstdcpp_%(gcc_version)s.spec"
+               % substitutions),
+             "w")
+    f.write(spec_file % substitutions)
+    f.close()
+    
+
+locale_Makefile = """\
+# Do not edit -- this file automatically generated by %(prog_name)s.
+# Makefile to build locale files needed by libstdc++-v3 testsuite.
+
+root := @ROOT@
+
+podir := $(root)/po
+
+POS := $(wildcard $(podir)/*.po)
+LANGS := $(basename $(notdir $(POS)))
+MOS := $(addsuffix /LC_MESSAGES/libstdc++.mo,$(LANGS))
+DIRS := $(addsuffix /LC_MESSAGES,$(LANGS))
+
+# Allow the user to set MSGFMT in their environment
+MSGFMT ?= msgfmt
+
+.PHONY: locales
+
+locales: $(POS)
+\tmkdir -p $(DIRS)
+\tfor lang in $(LANGS); \\
+\t    do $(MSGFMT) $(podir)/$$lang.po -o $$lang/LC_MESSAGES/libstdc++.mo; \\
+\tdone
+
+"""
+
+util_Makefile = """\
+# Do not edit -- this file automatically generated by %(prog_name)s.
+# Makefile to build utility files needed by libstdc++-v3 testsuite.
+
+root := @ROOT@
+CXX := @CXX@
+CXXFLAGS := @CXXFLAGS@
+
+VPATH := $(root)/testsuite
+
+v3test_SOURCES := testsuite_hooks.cc testsuite_allocator.cc
+abi_check_SOURCES := abi_check.cc
+
+v3test_OBJECTS := $(v3test_SOURCES:.cc=.o)
+
+libv3test.a: $(v3test_OBJECTS)
+\t$(AR) r $@ $^
+
+abi_check: $(abi_check_SOURCES)
+\t$(CXX) $(CXXFLAGS) $^ -o $@
+"""
+
+README_file = """\
+GNU C++ RUNTIME LIBRARY TESTSUITE
+=================================
+
+This package contains the GNU C++ Runtime Library Testsuite for
+version %(gcc_version)s of the GNU Compiler Collection.  The tests contained in
+this package are the same tests distributed with the GNU Compiler
+Collection.  The QMTest extension modules included in this package was
+developed by CodeSourcery, LLC under contract from the Free Standards
+Group.
+
+For assistance with this software, please contact:
+
+  support@codesourcery.com
+
+For general information about QMTest, the software used to run these
+tests, please visit:
+
+  http://www.qmtest.com
+
+You can also send mail to the QMTest mailing list:
+
+  qmtest@codesourcery.com
+
+if you have questions about QMTest.
+
+PREREQUISITES
+=============
+
+- Python 2.2 (or later)
+
+  Python binary packages are available for all popular GNU/Linux
+  distributions and for many other operating systems.  If you do not
+  already have Python, visit http://www.python.org.
+
+- QMTest 2.2 (or later)
+
+  As of this writing QMTest 2.2 has not yet been released.  
+
+  A Red Hat Package Manager (RPM) distribution of a QMTest snapshot
+  that works with this testsuite is available at:
+
+    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040317/qm-20040317.noarch.rpm
+
+  The RPM is architecture-independent; it can be installed on any
+  GNU/Linux system that supports the RPM format.
+
+  You can also obtain the source for QMTest from CVS by following the
+  directions at:
+
+    http://www.codesourcery.com/qm/qmtest_development
+
+- GNU Compiler Collection
+
+  In order to test the GNU C++ Runtime Library, you must install
+  the GNU C++ Compiler (G++) and its associated Runtime Library.
+
+INSTALLATION
+============
+
+There are two installation methods for the Testsuite, depending on
+which package format you select.  Both package formats contain
+identical files; which package format you select is purely a matter of
+preference.
+
+GNU Zip Tape Archive
+--------------------
+
+Download the file:
+
+  qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
+
+Then, unpack the file with the following command:
+
+  tar xzf qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
+
+Red Hat Package Manager
+-----------------------
+
+Download the file:
+
+  qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.noarch.rpm
+
+Then, install the file with the following command, which must be run
+as "root":
+
+  rpm -i qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.noarch.rpm
+
+The package will be installed in:
+
+  /usr/share/qmtest_libstdcpp_%(gcc_version)s
+
+USAGE
+=====
+
+The following examples all assume that you are using the Bourne shell.
+If you are using an alternative shell, you may have to make minor
+changes to the commands.  Furthermore, these commands assume that the
+environment variable "PKGROOT" is the path to the directory in which
+you installed the Testsuite.  For example, if you used the RPM
+installation, "PKGROOT" should be set to
+"/usr/share/qmtest_libstdcpp_%(gcc_version)s".  These examples assume that both
+"qmtest" and "g++" are in your "PATH" and that "g++" is the compiler
+that you wish to test.  You must also ensure that the
+"LD_LIBRARY_PATH" environment variable includes the directory in which
+the GNU C++ Runtime Library has been installed.  If your "g++" is in
+"/path/to/bin/g++", then your "LD_LIBRARY_PATH" should include
+"/path/to/lib".
+
+There are four steps required to run the testsuite:
+
+1. Tell QMTest where to find the extension classes required for the
+   Testsuite:
+
+     $ QMTEST_CLASS_PATH=$PKGROOT/qm-classes/qmtc:$PKGROOT/qm-classes/qmtest_gcc
+     $ export QMTEST_CLASS_PATH
+
+2. Create a test database.
+
+     $ qmtest -D v3db create-tdb -c v3_database.V3Database \\
+                                 -a srcdir=$PKGROOT/testsuite
+
+3. Create a context file.
+ 
+   The file should be named "v3db/context" and should contain contents
+   similar to:
+
+     CompilerTable.languages=cplusplus
+     CompilerTable.cplusplus_kind=GCC
+     CompilerTable.cplusplus_path=g++
+     CompilerTable.cplusplus_options=
+     DejaGNUTest.target=i686-pc-linux-gnu
+     V3Init.scratch_dir=scratch
+
+  You should adjust the "DejaGNUTest.target" line to indicate the GNU
+  triplet for your operating system.
+
+4. Run the tests:
+
+     $ cd v3db
+     $ qmtest run
+
+   QMTest will display the results on the standard error stream.
+
+   All released versions of G++ fail some of these tests.  Therefore,
+   you should not be surprised to see some failures.
+
+   If you would like the results in the TET output format, use the
+   following command:
+
+     $ qmtest run \\
+         --result-stream="tet_stream.TETStream(filename='results.tet')"
+
+   This command will write the results into the file "results.tet"
+   using TET output format.
+
+   If you would like to compare the results with the benchmark results
+   available obtained with version %(gcc_version)s of the GNU Compiler
+   Collection on an i686-pc-linux-gnu machine, use the
+   following command:
+
+     $ qmtest run \\
+         -O $PKGROOT/qm-baselines/%(gcc_version)s_i686-pc-linux-gnu.qmr
+
+  QMTest supports a variety of more complex usage scenarios.  For more
+  information see the QMTest manual, available at:
+
+    http://www.codesourcery.com/qm/qmtest_manual
+"""
+
+PKGINFO_file = """\
+This package generated automatically by %(prog_name)s.
+
+Invoked by %(user)s at %(time)s.
+Call was:
+  $ %(prog_name)s %(prog_args)s
+
+"""
+
+spec_file = """\
+# Do not edit -- this file automatically generated by %(prog_name)s.
+Summary:     libstdc++-v3 testsuite packaged to be run under QMTest.
+Name:        qmtest_libstdcpp_%(gcc_version)s
+Packager:    Nathaniel Smith <njs@codesourcery.com>
+Copyright:   Various
+Version:     %(pkg_version)s
+Release:     1
+Group:       Development/Tools
+BuildRoot:   %%{_tmppath}/%%{name}-buildroot
+Source:      qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
+Vendor:      CodeSourcery LLC
+BuildArchitectures: noarch
+
+%%description
+This package includes the libstdc++-v3 testsuite from gcc version
+%(gcc_version)s, together with QMTest extensions allowing one to run the
+testsuite against an installed version of libstdc++.
+
+%%prep
+%%setup -q
+
+%%build
+
+%%install
+rm -rf $RPM_BUILD_ROOT
+DIR=$RPM_BUILD_ROOT/usr/share/qmtest_libstdcpp_%(gcc_version)s
+mkdir -p $DIR
+for thing in `cat contents`; do
+    if [ -d "$thing" ]; then
+        cp -r "$thing" "$DIR/$thing"
+    else
+        cp "$thing" "$DIR/$thing"
+    fi
+done
+
+%%clean
+rm -rf $RPM_BUILD_ROOT
+
+%%files
+# Install all files as root:
+%%defattr(-,root,root)
+/usr/share/qmtest_libstdcpp_%(gcc_version)s/
+%%doc README
+
+%%changelog
+* Tue Mar 16 2004 Nathaniel Smith <njs@codesourcery.com> 
+- Initial release.
+
+"""
+
+if __name__ == "__main__":
+    main(sys.argv[0], sys.argv[1:])
