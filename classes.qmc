@@ -1,0 +1,2 @@
+<?xml version="1.0" ?>
+<class-directory><class kind="database">gcc_database.GPPDatabase</class><class kind="test">old_dejagnu_test.OldDejaGNUTest</class><class kind="test">gpp_dg_test.GPPDGTest</class></class-directory>
