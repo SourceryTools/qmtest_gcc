@@ -94,7 +94,7 @@ class GCCTestBase:
 	'cflags' -- The options provided to the test."""
 
 	if cflags:
-	    message = "%s, %s" (testcase, cflags)
+	    message = "%s, %s" % (testcase, cflags)
 	else:
 	    message = testcase
 	self._RecordDejaGNUOutcome(result, DejaGNUTest.PASS, message)
@@ -110,7 +110,7 @@ class GCCTestBase:
 	'cflags' -- The options provided to the test."""
 
 	if cflags:
-	    message = "%s, %s" (testcase, cflags)
+	    message = "%s, %s" % (testcase, cflags)
 	else:
 	    message = testcase
 	self._RecordDejaGNUOutcome(result, DejaGNUTest.FAIL, message)

@@ -83,6 +83,8 @@ class ProfileTest(DejaGNUTest):
                                    execname1,
                                    "executable",
                                    o)
+            self._CheckCompile(result, self.GetId() + " compilation",
+                               ostr, execname1, output)
 
             # Run the profiled executable.
             outcome = self._RunTargetExecutable(context, result, execname1,
@@ -114,6 +116,8 @@ class ProfileTest(DejaGNUTest):
                                    execname2,
                                    "executable",
                                    o)
+            self._CheckCompile(result, self.GetId() + "compilation",
+                               ostr, execname2, output)
 
             # Run the executable.
             outcome = self._RunTargetExecutable(context, result, execname2)

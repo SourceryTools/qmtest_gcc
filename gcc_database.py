@@ -15,8 +15,6 @@
 # Imports
 ########################################################################
 
-from   gpp_dg_test import GPPDGTest
-from   old_dejagnu_test import OldDejaGNUTest
 import os
 import qm
 from   qm.attachment import Attachment, FileAttachmentStore
@@ -24,6 +22,7 @@ from   qm.test.database import ResourceDescriptor, TestDescriptor
 from   qm.test.file_database import FileDatabase
 from   qm.test.directory_suite import DirectorySuite
 from   qm.test.runnable import Runnable
+from   qm.test.suite import Suite
 
 ########################################################################
 # Classes
@@ -133,11 +132,15 @@ class GCCDatabase(FileDatabase):
         return self.__store
 
 
-    def _GetSuiteFromPath(self, suite_id, path):
+    def GetSuite(self, suite_id):
 
-        return DirectorySuite(self, suite_id)
+        if suite_id == "g++":
+            return Suite(self, suite_id, implicit = 1,
+                         suite_ids = ["g++.dg", "g++.old-deja"])
 
-
+        return super(GCCDatabase, self).GetSuite(suite_id)
+                     
+        
     def _GetTestFromPath(self, test_id, path):
 
         # Figure out which test class to use.
@@ -179,7 +182,7 @@ class GCCDatabase(FileDatabase):
         
     def _IsFile(self, kind, path):
 
-        # Suites are directories.
+        # All directories are suites.
         if kind == self.SUITE:
             return os.path.isdir(path)
 
