@@ -447,6 +447,35 @@ There are four steps required to run the testsuite:
   information see the QMTest manual, available at:
 
     http://www.codesourcery.com/qm/qmtest_manual
+
+BASELINE FILES
+==============
+
+In the interests of insuring binary compatibility, the libstdc++
+testsuite compares the symbols exported by the libstdc++ under test to
+those exported by some canonical baseline version.  Unfortunately, these
+baseline versions are different for each architecture, and so this
+package may not contain a baseline file for your architecture.  If this
+happens, the test "v3_abi_test" will return an ERROR, and complain that
+its baseline file does not exist.
+
+The solution is to create a baseline file.  To do so, download the
+source for GCC version %(gcc_version)s, and build it normally.  Say that
+the GCC source tree is $SRC, and you have built it in $BUILD.  Now, do
+the following:
+  $ cd $BUILD/<your architecture>/libstdc++-v3/testsuite
+  $ make new-abi-baseline
+This will generate a new baseline directory called
+  $SRC/libstdc++/config/abi/<your architecture>
+Drop this directory in $PKGROOT/config/abi/, and the test suite should
+now work.
+
+To build an RPM package with the new baseline included, start with the
+.tar.gz distribution, unpack it, follow the above instructions, then
+repack it and run
+  $ rpm -tb <the new .tar.gz file>
+as you would to build any other RPM.
+
 """
 
 testsuite_hooks_addendum = """
@@ -481,6 +510,7 @@ Group:       Development/Tools
 BuildRoot:   %%{_tmppath}/%%{name}-buildroot
 Source:      qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
 Vendor:      CodeSourcery LLC
+Prefix:      /usr
 # If we let RPM detect dependencies, it will get the idea that this
 # package requires a specific version of libstdc++.so, and that is
 # unhelpful:
@@ -534,6 +564,11 @@ rm -rf $RPM_BUILD_ROOT
 %%doc build_binary_testsuite
 
 %%changelog
+* Mon Apr 19 2004 Nathaniel Smith <njs@codesourcery.com> 
+- Fix bug in computation of symbol baseline paths.
+- Make package relocatable.
+- Document generation of new symbol baseline files.
+
 * Mon Mar 29 2004 Nathaniel Smith <njs@codesourcery.com> 
 - Rework for no-compiler version of testsuite.
 

@@ -622,12 +622,7 @@ int main (void)
 # baseline_dir is set by autoconf to some mad thing...
 #    $glibcxx_srcdir/config/abi/${abi_baseline_pair}\$(MULTISUBDIR)"
 # abi_baseline_pair is set by autoconf to host_cpu-host_os by default.
-# But there are some special cases, in particular:
-#    x86_64-*-linux*     -> x86_64-linux-gnu
-#    alpha*-*-freebsd5*  -> alpha-freebsd5
-#    i*86-*-freebsd4*    -> i386-freebsd4
-#    i*86-*-freebsd5*    -> i386-freebsd5
-#    sparc*-*-freebsd5*  -> sparc-freebsd5
+# But there are some special cases.
 #
 # extract_symvers = $(glibcxx_srcdir)/scripts/extract_symvers
 # extract_symvers is actually just a shell script; we don't need to
@@ -778,8 +773,21 @@ class V3ABITest(Test, V3Base):
 
         Emulates 'configure.host'."""
 
-        cpu, vendor, os = host.split("-", 2)
         m = fnmatch.fnmatch
+
+        # Special cases:
+        if m(host, "x86_64-*-linux*"):
+            return "x86_64-linux-gnu"
+        elif m(host, "alpha*-*-freebsd5*"):
+            return "alpha-freebsd5"
+        elif m(host, "i*86-*-freebsd4*"):
+            return "i386-freebsd4"
+        elif m(host, "i*86-*-freebsd5*"):
+            return "i386-freebsd5"
+        elif m(host, "sparc*-*-freebsd5*"):
+            return "sparc-freebsd5"
+
+        cpu, vendor, os = host.split("-", 2)
         if m(cpu, "alpha*"):
             cpu = "alpha"
         elif m(cpu, "i[567]86") or m(cpu, "x86_64"):
@@ -794,4 +802,3 @@ class V3ABITest(Test, V3Base):
             cpu = "sparc"
 
         return "%s-%s" % (cpu, os)
-            
