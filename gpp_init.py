@@ -21,6 +21,7 @@ from   dejagnu_base import DejaGNUBase
 from   qm.executable import RedirectedExecutable
 from   qm.test.resource import Resource
 import os
+import sys
 
 ########################################################################
 # Classes
@@ -74,11 +75,21 @@ class GPPInit(Resource, DejaGNUBase):
                                                      directory,
                                                      "libstdc++-v3"))
 
-        # Add -I flags so that the tests can find the V3 headers.
-        executable = RedirectedExecutable()
-        executable.Run([os.path.join(v3_directory, "testsuite_flags"),
-                        "--build-includes"])
-        options += executable.stdout.split()
+        # Run "testsuite_flags" to figure out which -I options to use
+        # when running tests.
+        command = [os.path.join(v3_directory, "testsuite_flags"),
+                   "--build-includes"]
+        result["GPPInit.testsuite_flags_command"] \
+            = "<pre>" + " ".join(command) + "</pre>"
+        try:
+            executable = RedirectedExecutable()
+            executable.Run(command)
+            options += executable.stdout.split()
+        except:
+            result.Fail("Could not run testsuite_flags")
+            result[result.EXCEPTION] = "%s: %s" % sys.exc_info()[:2]
+            return
+
         # Avoid splitting diagnostic message lines.
         options.append("-fmessage-length=0")
         # Remember the options to use.
