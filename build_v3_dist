@@ -292,7 +292,7 @@ PREREQUISITES
   A Red Hat Package Manager (RPM) distribution of a QMTest snapshot
   that works with this testsuite is available at:
 
-    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040317/qm-20040317.noarch.rpm
+    http://www.codesourcery.com/qm/qmtest_downloads/qm-20040331/qm-20040331.noarch.rpm
 
   The RPM is architecture-independent; it can be installed on any
   GNU/Linux system that supports the RPM format.
@@ -324,24 +324,41 @@ Download the file:
 
 Then, unpack the file with the following command:
 
-  tar xzf qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
+  $ tar xzf qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s.tar.gz
+
+And then build the testsuite by running:
+
+  $ cd qmtest_libstdcpp_%(gcc_version)s
+  $ ./build_binary_testsuite
+
+Before doing this, make sure that you have a canonical version of g++ in
+your "PATH", and a canonical version of libstdc++ in your
+"LD_LIBRARY_PATH"; the resulting testsuite will specifically test other
+libraries for compatibility with this compiler and library.  The command
+will generate copious log output; you may wish to use it to verify that
+the proper compiler was used.
+
+You must also ensure that a recent version of "qmtest" is in your path.
 
 Red Hat Package Manager
 -----------------------
 
-Download the file:
+A prebuilt version of the test suite for i386, compiled using the GNU
+3.3.3 release of g++ and libstdc++, is packaged in RPM format.  To
+install it, first download the file:
 
-  qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.noarch.rpm
+  qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.i386.rpm
 
 Then, install the file with the following command, which must be run
 as "root":
 
-  rpm -i qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.noarch.rpm
+  $ rpm -i qmtest_libstdcpp_%(gcc_version)s-%(pkg_version)s-1.i386.rpm
 
-The package will be installed in:
+The package will be installed in the directories:
 
   /usr/share/qmtest_libstdcpp_%(gcc_version)s
-
+  /usr/lib/qmtest_libstdcpp_%(gcc_version)s
+  
 USAGE
 =====
 
@@ -351,13 +368,19 @@ changes to the commands.  Furthermore, these commands assume that the
 environment variable "PKGROOT" is the path to the directory in which
 you installed the Testsuite.  For example, if you used the RPM
 installation, "PKGROOT" should be set to
-"/usr/share/qmtest_libstdcpp_%(gcc_version)s".  These examples assume that both
-"qmtest" and "g++" are in your "PATH" and that "g++" is the compiler
-that you wish to test.  You must also ensure that the
-"LD_LIBRARY_PATH" environment variable includes the directory in which
-the GNU C++ Runtime Library has been installed.  If your "g++" is in
-"/path/to/bin/g++", then your "LD_LIBRARY_PATH" should include
-"/path/to/lib".
+"/usr/share/qmtest_libstdcpp_%(gcc_version)s".  They also assume that
+the environment variable "EXECROOT" is the path in which the
+pre-generated test executables are stored.  If you used the RPM
+installation, "EXECROOT" should be set to
+"/usr/lib/qmtest_libstdcpp_%(gcc_version)s".  If you used the TAR
+archive installation, "EXECROOT" should be set to
+"$PKGROOT/qm-executables".
+
+These examples assume that "qmtest" is in your path.  You must also
+ensure that the "LD_LIBRARY_PATH" environment variable includes the
+directory in which the GNU C++ Runtime Library has been installed.  If
+your "g++" is in "/path/to/bin/g++", then your "LD_LIBRARY_PATH" should
+include "/path/to/lib".
 
 There are four steps required to run the testsuite:
 
@@ -377,15 +400,18 @@ There are four steps required to run the testsuite:
    The file should be named "v3db/context" and should contain contents
    similar to:
 
-     CompilerTable.languages=cplusplus
-     CompilerTable.cplusplus_kind=GCC
-     CompilerTable.cplusplus_path=g++
-     CompilerTable.cplusplus_options=
-     DejaGNUTest.target=i686-pc-linux-gnu
+     CompilerTable.languages=
+     V3Test.have_compiler=no
      V3Test.scratch_dir=scratch
+     V3Test.compiler_output_dir=$EXECROOT
+     DejaGNUTest.target=i686-pc-linux-gnu
 
-  You should adjust the "DejaGNUTest.target" line to indicate the GNU
-  triplet for your operating system.
+  WARNING: You must replace $EXECROOT in the above with the actual path
+  to your executables; QMTest will not perform environment variable
+  expansion on this file.
+
+  You should also adjust the "DejaGNUTest.target" line to indicate the
+  GNU triplet for your operating system.
 
 4. Run the tests:
 
@@ -407,12 +433,15 @@ There are four steps required to run the testsuite:
    using TET output format.
 
    If you would like to compare the results with the benchmark results
-   available obtained with version %(gcc_version)s of the GNU Compiler
-   Collection on an i686-pc-linux-gnu machine, use the
-   following command:
+   obtained with the canonical compiler/library used to build the
+   testsuite on your architecture, use the following command.
 
-     $ qmtest run \\
-         -O $PKGROOT/qm-baselines/%(gcc_version)s_i686-pc-linux-gnu.qmr
+     $ qmtest run -O $PKGROOT/qm-baselines/<arch>.qmr
+
+  For example, if you are running QMTest on Linux running on the Intel
+  x86 architecture, use:
+  
+     $ qmtest run -O $PKGROOT/qm-baselines/i686-pc-linux-gnu.qmr
 
   QMTest supports a variety of more complex usage scenarios.  For more
   information see the QMTest manual, available at:
