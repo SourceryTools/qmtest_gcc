@@ -143,8 +143,9 @@ class GCCDGTortureTest(GCCDGTest):
 
     This variable emulates 'torture_with_loops' in 'gcc-dg.exp'."""
 
-    _torture_without_loops \
-        = filter(lambda s: s.find("loop") == -1, _torture_with_loops)
+    _torture_without_loops = [item for item in _torture_with_loops
+                              if [arg for arg in item
+                                  if arg.find("loop") == -1]]
     """A subset of 'torture_with_loops' that does not do loop optimizations.
 
     This variable emulates 'torture_without_loops' in 'gcc-dg.exp'."""

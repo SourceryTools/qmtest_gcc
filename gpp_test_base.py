@@ -37,15 +37,16 @@ class GPPTestBase(GCCTestBase):
     def _GetTargetEnvironment(self, context):
 
         env = {}
-        dirs = ":".join(context["GPPInit.library_directories"])
-        for v in ("LD_LIBRARY_PATH",
-                  "SHLIB_PATH",
-                  "LD_LIBRARY_N32_PATH",
-                  "LD_LIBRARY64_PATH"):
-            val = os.environ.get(v, "")
-            if val:
-                env[v] = val + ":" + dirs
-            else:
-                env[v] = dirs
+	if context[self._libdir_context_property]:
+            dirs = ":".join(context[self._libdir_context_property])
+            for v in ("LD_LIBRARY_PATH",
+                      "SHLIB_PATH",
+                      "LD_LIBRARY_N32_PATH",
+                      "LD_LIBRARY64_PATH"):
+                val = os.environ.get(v, "")
+                if val:
+                    env[v] = val + ":" + dirs
+                else:
+                    env[v] = dirs
 
         return env

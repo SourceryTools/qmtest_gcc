@@ -171,6 +171,8 @@ class GCCTestBase:
         # Add the source files if they have not already been added.
         if mode == Compiler.MODE_ASSEMBLE:
             command += source_files
+        elif mode == Compiler.MODE_LINK:
+            command += compiler.GetLDFlags()
 
         # Run the compiler.
         index = self._RecordCommand(result, command)

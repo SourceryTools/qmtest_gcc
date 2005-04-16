@@ -57,15 +57,48 @@ class GPPInit(Resource, DejaGNUBase):
                        + options
                        + ['--print-multi-dir'])
         directory = executable.stdout[:-1]
+
+        # Assume that no additional library directories need to be
+        # explicitly provided to the compiler. 
+        context["GPPInit.library_directories"] = []
         
-        # Find the directory containing the compiler by looking for
-        # the first -B option.  (This is the technique used by
+        # If the compiler is being run out of the build directory,
+        # perform special set up associated with that configuration.
+        # To determine whether the compiler is being run out of the
+        # build directory, we find the compiler by looking for the
+        # first -B option.  (This is the technique used by
         # get_multilibs in libgloss.exp.)
         for o in options:
             if o.startswith("-B"):
                 objdir = os.path.dirname(os.path.dirname(o[2:]))
+                options.append(self.__SetUpInObjdir(result, context, objdir))
                 break
         
+
+        # Avoid splitting diagnostic message lines.
+        options.append("-fmessage-length=0")
+        # Remember the options to use.
+        context["GPPInit.options"] = options
+        
+
+    def __SetUpInObjdir(self, result, context, objdir):
+        """Setup for a compiler being run out of the build directory.
+
+        'objdir' -- The path to the 'objdir' directory, i.e., the
+        directory that contains 'xgcc'.
+        
+        'result' -- As for 'SetUp'.
+
+        'context' -- As for 'SetUp'.
+
+        returns -- A list of additional command-line options that
+        should be provided to the compiler.
+        
+        It the compiler being tested is not an installed compiler, but
+        is in in the GCC build directory, then additional command-line
+        options must be passed to 'g++' to make it aware of the
+        location of various components."""
+
         # Compute the path to the V3 object directory.  See 'g++_init'
         # in the GCC testsuite for the DejaGNU equivalent to this
         # code.
@@ -86,11 +119,11 @@ class GPPInit(Resource, DejaGNUBase):
         try:
             executable = RedirectedExecutable()
             executable.Run(command)
-            options += executable.stdout.split()
+            options = executable.stdout.split()
         except:
             result.NoteException(cause="Could not run testsuite_flags",
                                  outcome=Result.FAIL)
-            return
+            return []
 
         # Avoid splitting diagnostic message lines.
         options.append("-fmessage-length=0")
@@ -105,4 +138,4 @@ class GPPInit(Resource, DejaGNUBase):
         lib_dirs.append(os.path.join(objdir, "gcc"))
         context["GPPInit.library_directories"] = lib_dirs
     
-
+        return options

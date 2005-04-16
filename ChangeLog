@@ -1,0 +1,9 @@
+2005-04-15  Stefan Seefeld  <stefan@codesourcery.com>
+
+	* gcc_dg_test.py: Adjust filter to change in option format.
+	* gcc_test_base.py: Support new compiler's ldflags.
+	* gpp_init.py: Make 'GPPInit.library_directories' variable
+	optional.
+	* gpp_test_base.py: Likewise.
+	
+
