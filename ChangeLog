@@ -1,5 +1,11 @@
 2005-07-19  Mark Mitchell  <mark@codesourcery.com>
 
+	* gcc_test_base.py (GCCTestBase._Compile): Use
+	CompilerTable.compilers, not CompilerTable.compiler_table.
+	* gpp_init.py (GPPInit.SetUp): Likewise.
+	* v3_test.py (V3Init.SetUp): Likewise.
+	(V3DGTest._RequireIconv): Likewise.
+	
 	* gcc_test_base.py (GCCTestBase._Compile): Correct typo.
 
 2005-04-15  Stefan Seefeld  <stefan@codesourcery.com>

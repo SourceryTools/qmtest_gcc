@@ -97,7 +97,7 @@ class V3Init(Resource, V3Base):
 
         # Find the compiler.
         if self._HaveCompiler(context):
-            compilers = context["CompilerTable.compiler_table"]
+            compilers = context["CompilerTable.compilers"]
             compiler = compilers["cplusplus"]
 
 
@@ -568,7 +568,7 @@ int main (void)
                 % {"charset": charset})
         f.close()
 
-        compiler = context["CompilerTable.compiler_table"][self._language]
+        compiler = context["CompilerTable.compilers"][self._language]
         options = []
 
         options += context["V3Test.basic_cxx_flags"]

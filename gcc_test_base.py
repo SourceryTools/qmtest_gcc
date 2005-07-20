@@ -145,7 +145,7 @@ class GCCTestBase:
         # Form the command-line.  Using Compiler.GetCompilationCommand
         # isn't guaranteed to create exactly the same command used by
         # DejaGNU, so we form the command manually.
-        compiler = context["CompilerTable.compiler_table"][self._language]
+        compiler = context["CompilerTable.compilers"][self._language]
         command = [compiler.GetPath()]
         # Add the global options (as originally specified in the
         # context file).  These are added before the options for this

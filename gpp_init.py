@@ -38,7 +38,7 @@ class GPPInit(Resource, DejaGNUBase):
         super(GPPInit, self)._SetUp(context)
         
         # Find the compiler table.
-        compilers = context["CompilerTable.compiler_table"]
+        compilers = context["CompilerTable.compilers"]
 
         # Get the C++ compiler.
         compiler = compilers["cplusplus"]
