@@ -1,3 +1,7 @@
+2005-07-20  Mark Mitchell  <mark@codesourcery.com>
+
+	* setup.py: New script.
+
 2005-07-19  Mark Mitchell  <mark@codesourcery.com>
 
 	* gcc_test_base.py (GCCTestBase._Compile): Use
