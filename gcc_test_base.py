@@ -182,7 +182,7 @@ class GCCTestBase:
                     
         # If there was no output, DejaGNU uses the exit status.
         if not output and status != 0:
-            output = "exit statis is %d" % status
+            output = "exit status is %d" % status
 
         return output
         

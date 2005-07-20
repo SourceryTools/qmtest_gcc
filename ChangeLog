@@ -1,3 +1,7 @@
+2005-07-19  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc_test_base.py (GCCTestBase._Compile): Correct typo.
+
 2005-04-15  Stefan Seefeld  <stefan@codesourcery.com>
 
 	* gcc_dg_test.py: Adjust filter to change in option format.
