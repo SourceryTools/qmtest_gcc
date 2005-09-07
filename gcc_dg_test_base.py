@@ -79,9 +79,9 @@ class GCCDGTestBase(DGTest):
                     expectation = self.FAIL
             # See if the pattern appears in the output.
             pattern = args[0]
-            output_file = self.__GetOutputFile(context,
-                                               self.KIND_COMPILE,
-                                               self.GetId())
+            output_file = self._GetOutputFile(context,
+                                              self.KIND_COMPILE,
+                                              self.GetId())
             output = open(output_file).read()
             c = len(re.findall(pattern, output))
 
@@ -99,9 +99,9 @@ class GCCDGTestBase(DGTest):
             self.__ScanFile(result,
                             context,
                             command,
-                            self.__GetOutputFile(context,
-                                                 self.KIND_COMPILE,
-                                                 self.GetId()),
+                            self._GetOutputFile(context,
+                                                self.KIND_COMPILE,
+                                                self.GetId()),
                             args)
         elif command in ("scan-file", "scan-file-not"):
             self.__ScanFile(result,
@@ -165,14 +165,14 @@ class GCCDGTestBase(DGTest):
             kind = DGTest.KIND_ASSEMBLE
         else:
             is_repo_test = 0
-        file = self.__GetOutputFile(context, kind, path)
+        file = self._GetOutputFile(context, kind, path)
         kind = self._test_kind_map[kind]
         output = self._Compile(context, result, source_files, file,
                                kind, options)
         if is_repo_test:
             kind = DGTest.KIND_LINK
             object_file = file
-            file = self.__GetOutputFile(context, kind, path)
+            file = self._GetOutputFile(context, kind, path)
             kind = self._test_kind_map[kind]
             output += self._Compile(context, result, [object_file], file,
                                     kind, options)
@@ -180,7 +180,7 @@ class GCCDGTestBase(DGTest):
         return (output, file)
 
         
-    def __GetOutputFile(self, context, kind, path = None):
+    def _GetOutputFile(self, context, kind, path):
         """Return the compilation mode and output file name for the test.
 
         'kind' -- The kind of test being performed; one of
@@ -189,9 +189,7 @@ class GCCDGTestBase(DGTest):
         'path' -- The path to the file being compiled.  If 'None', the
         primary source path is used.
         
-        returns -- A pair '(mode, file)' where 'mode' is one of the
-        'Compiler.modes' and 'file' is the name of the output file
-        generated."""
+        returns -- The name of the output file generated."""
         
         ext = self.__extension_map[kind]
         file = os.path.basename(path)

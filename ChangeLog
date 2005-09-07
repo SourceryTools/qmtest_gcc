@@ -1,3 +1,8 @@
+2005-09-06  Stefan Seefeld  <stefan@codesourcery.com>
+
+	* gcc_dg_test_base.py: Rename __GetOutputFile to _GetOutputFile
+	to make it publicly accessible.
+
 2005-07-20  Mark Mitchell  <mark@codesourcery.com>
 
 	* setup.py: New script.
