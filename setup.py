@@ -15,6 +15,7 @@
 # Imports
 ########################################################################
 
+from qm.dist.distribution import Distribution
 from distutils.core import setup
 
 ########################################################################
@@ -29,9 +30,5 @@ setup(
     maintainer_email = "qmtest@codesourcery.com",
     description = "QMTest support for testing GCC",
     
-    package_dir = { "qmtest_gcc" : "." },
-    packages = ("qmtest_gcc",)
-    )
-      
-      
-      
+    distclass=Distribution,
+    qmtest_extensions="extensions")

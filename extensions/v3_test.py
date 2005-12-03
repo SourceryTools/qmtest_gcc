@@ -586,10 +586,9 @@ int main (void)
                                             tmpdir, options, tmpx)
         if output == "":
             # ...and then running it, if there are no errors.
-            executable = self.TargetExecutable(self.executable_timeout)
-            command = [tmpx]
+            host = context['CompilerTable.target']
             environment = self._GetTargetEnvironment(context)
-            status = executable.Run(command, environment, tmpdir)
+            status, output = host.Run(tmpx, environment, tmpdir)
             if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
                 # We have working libiconv.  Continue as normal.
                 return
